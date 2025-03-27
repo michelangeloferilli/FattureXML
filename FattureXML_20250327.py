@@ -1,3 +1,4 @@
+from autocomplete_comuni import AutocompleteComune
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 import os
@@ -9,12 +10,14 @@ import glob
 import copy
 import traceback
 import re
+from tkcalendar import DateEntry
+import datetime
 
 class FatturaViewer(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Gestione Fatture Elettroniche")
-        self.geometry("900x600")
+        self.geometry("960x640")
         
         self.xml_path = None
         self.xsl_path = None
@@ -52,6 +55,91 @@ class FatturaViewer(tk.Tk):
         else:
             if not elem.tail or not elem.tail.strip():
                 elem.tail = i
+
+
+
+    def create_date_field(self, parent, value, width=25):
+        """
+        Crea un campo data con datepicker
+        
+        Args:
+            parent: Widget genitore in cui inserire il campo
+            value: Valore iniziale della data (formato YYYY-MM-DD)
+            width: Larghezza del campo di input
+            
+        Returns:
+            tuple: (frame_contenitore, widget_entry)
+        """
+        # Frame che conterrà sia l'entry che il pulsante calendario
+        date_frame = tk.Frame(parent)
+        
+        # Campo di input per la data
+        entry_widget = tk.Entry(date_frame, width=width)
+        entry_widget.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Inserisci la data iniziale nel campo
+        entry_widget.insert(0, value)
+        
+        # Funzione per aprire il datepicker
+        def open_calendar(event=None):
+            # Ottieni la posizione corrente del puntatore
+            x, y = self.winfo_pointerxy()
+            
+            # Crea una finestra popup per il calendario
+            top = tk.Toplevel(self)
+            top.geometry(f"+{x}+{y}")  # Posiziona vicino al puntatore
+            top.title("Seleziona data")
+            top.resizable(False, False)
+            top.grab_set()  # Rende la finestra modale
+            
+            # Tenta di usare la data già presente nel campo come default
+            try:
+                if entry_widget.get():
+                    date_obj = datetime.datetime.strptime(entry_widget.get(), "%Y-%m-%d").date()
+                else:
+                    date_obj = datetime.date.today()
+            except ValueError:
+                date_obj = datetime.date.today()
+            
+            # Crea il widget calendario
+            cal = DateEntry(top, width=12, background='darkblue',
+                            foreground='white', borderwidth=2, 
+                            date_pattern='yyyy-mm-dd',
+                            year=date_obj.year, 
+                            month=date_obj.month, 
+                            day=date_obj.day)
+            cal.pack(padx=10, pady=10)
+            
+            # Pulsanti di conferma e annullamento
+            btn_frame = tk.Frame(top)
+            btn_frame.pack(fill="x", padx=10, pady=5)
+            
+            # Funzione per impostare la data selezionata nel campo di input
+            def set_date():
+                selected_date = cal.get_date().strftime("%Y-%m-%d")
+                entry_widget.delete(0, tk.END)
+                entry_widget.insert(0, selected_date)
+                top.destroy()
+            
+            # Pulsante OK
+            ok_btn = tk.Button(btn_frame, text="OK", command=set_date)
+            ok_btn.pack(side=tk.RIGHT, padx=5)
+            
+            # Pulsante Annulla
+            cancel_btn = tk.Button(btn_frame, text="Annulla", command=top.destroy)
+            cancel_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # Collega l'azione di doppio clic all'apertura del calendario
+        entry_widget.bind("<Double-1>", open_calendar)
+        
+        # Aggiungi un pulsante con icona calendario
+        calendar_btn = tk.Button(date_frame, text="📅", command=open_calendar)
+        calendar_btn.pack(side=tk.RIGHT)
+        
+        # Aggiungi il pulsante alla lista dei widget per pulizia
+        self.edit_widgets.append(calendar_btn)
+        
+        return date_frame, entry_widget
 
     def create_widgets(self):
         main_frame = tk.Frame(self)
@@ -199,7 +287,7 @@ class FatturaViewer(tk.Tk):
         except Exception as e:
             self.log(f"Errore durante la trasformazione: {str(e)}")
             messagebox.showerror("Errore", f"Si è verificato un errore durante la trasformazione:\n{str(e)}")
-    
+            
     def edit_invoice(self):
         if not self.xml_path or not self.xml_doc:
             messagebox.showerror("Errore", "Seleziona prima un file XML valido")
@@ -212,7 +300,29 @@ class FatturaViewer(tk.Tk):
         self.line_modifications = {}
         
         self.log_frame.pack_forget()
+        
+        # Riconfigura il frame dell'editor per una migliore visualizzazione
         self.editor_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Rimuovi i vecchi pulsanti dell'editor se esistono
+        if hasattr(self, 'editor_buttons_frame') and self.editor_buttons_frame.winfo_exists():
+            self.editor_buttons_frame.destroy()
+        
+        # Riconfigura il canvas e la scrollbar
+        self.editor_canvas.delete("all")
+        self.editor_scrollable_frame = ttk.Frame(self.editor_canvas)
+        self.editor_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.editor_canvas.configure(scrollregion=self.editor_canvas.bbox("all"))
+        )
+        self.editor_canvas.create_window((0, 0), window=self.editor_scrollable_frame, anchor="nw")
+        
+        # Funzione per gestire lo scrolling con rotellina del mouse da qualunque widget figlio
+        def _on_mousewheel(event):
+            self.editor_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        # Aggiungi la gestione scrolling al frame principale e a tutti i sottowdiget
+        self.editor_frame.bind_all("<MouseWheel>", _on_mousewheel)
         
         self.log("Scansione documento XML...")
         try:
@@ -224,12 +334,14 @@ class FatturaViewer(tk.Tk):
         except Exception as e:
             self.log(f"Errore nell'analisi del documento XML: {str(e)}")
         
+        # Crea i campi di modifica con il nuovo layout
         self.create_edit_fields()
-
-        # Dopo aver creato i campi, inizializza i totali
+        
+        # Aggiorna i totali nel riepilogo
         self.update_riepilogo_totals()        
         self.log("Modalità modifica attivata")
-    
+
+
     def try_find_element(self, path, namespaces):
         try:
             elements = self.xml_doc.getroot().xpath(path, namespaces=namespaces)
@@ -244,11 +356,22 @@ class FatturaViewer(tk.Tk):
             return None, ""
 
 
+
     def create_edit_fields(self):
         root = self.xml_doc.getroot()
         ns = self.NS
         
-        sections = [
+        # Definisci quali campi sono campi data
+        date_fields = [
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/Data",
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/DataScadenzaPagamento"
+        ]
+        
+        # Valori possibili per Aliquota IVA
+        aliquote_iva = ["4.00", "5.00", "10.00", "22.00"]
+        
+        # Definizione delle sezioni
+        left_sections = [
             ("Dati Intestazione", [
                 ("//p:FatturaElettronica/FatturaElettronicaHeader/DatiTrasmissione/IdTrasmittente/IdPaese", "ID Paese"),
                 ("//p:FatturaElettronica/FatturaElettronicaHeader/DatiTrasmissione/IdTrasmittente/IdCodice", "ID Codice"),
@@ -277,39 +400,240 @@ class FatturaViewer(tk.Tk):
                 ("//p:FatturaElettronica/FatturaElettronicaHeader/CessionarioCommittente/Sede/Comune", "Comune"),
                 ("//p:FatturaElettronica/FatturaElettronicaHeader/CessionarioCommittente/Sede/Provincia", "Provincia"),
                 ("//p:FatturaElettronica/FatturaElettronicaHeader/CessionarioCommittente/Sede/Nazione", "Nazione")
-            ]),
+            ])
+        ]
+        
+        right_sections = [
             ("Dati Generali Documento", [
                 ("//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/TipoDocumento", "Tipo Documento"),
                 ("//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/Divisa", "Divisa"),
                 ("//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/Data", "Data"),
                 ("//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/Numero", "Numero"),
                 ("//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/ImportoTotaleDocumento", "Importo Totale")
+            ]),
+            ("Dati Riepilogo", [
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/AliquotaIVA", "Aliquota IVA"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/ImponibileImporto", "Imponibile"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta", "Imposta"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/EsigibilitaIVA", "Esigibilità IVA")
+            ]),
+            ("Dati Pagamento", [
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/CondizioniPagamento", "Condizioni Pagamento"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/ModalitaPagamento", "Modalità Pagamento"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/DataScadenzaPagamento", "Data Scadenza"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/ImportoPagamento", "Importo Pagamento"),
+                ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/CodicePagamento", "Codice Pagamento")
             ])
         ]
         
-        row = 0
-        self.edit_widgets = []
+        # Creazione del layout a due colonne
+        columns_frame = tk.Frame(self.editor_scrollable_frame)
+        columns_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
+        self.edit_widgets.append(columns_frame)
+        
+        # Colonna sinistra
+        left_column = tk.Frame(columns_frame)
+        left_column.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        
+        # Colonna destra
+        right_column = tk.Frame(columns_frame)
+        right_column.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # Inizializza i dizionari e le liste
+        self.edit_widgets = [columns_frame, left_column, right_column]
         self.edit_fields = {}
-        for section_title, fields in sections:
-            section_frame = tk.LabelFrame(self.editor_scrollable_frame, text=section_title)
-            section_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        
+        # Dizionario per tenere traccia delle variabili StringVar dei campi
+        self.string_vars = {}
+        
+        # Popola la colonna sinistra
+        for section_title, fields in left_sections:
+            section_frame = tk.LabelFrame(left_column, text=section_title)
+            section_frame.pack(fill=tk.BOTH, expand=True, pady=5)
             self.edit_widgets.append(section_frame)
-            row += 1
+            
+            # Variabili per tenere traccia dei widget di comune, provincia e CAP
+            comune_var = None
+            provincia_var = None
+            cap_var = None
+            comune_widget = None
+            provincia_xpath = None
+            cap_xpath = None
+            comune_xpath = None
+            comune_row = None
+            
             for i, (xpath, label) in enumerate(fields):
                 element, value = self.try_find_element(xpath, self.NS)
                 label_widget = tk.Label(section_frame, text=label + ":")
                 label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
-                entry_widget = tk.Entry(section_frame, width=40)
-                entry_widget.insert(0, value)
-                entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                
+                # Crea una variabile StringVar per ogni campo
+                string_var = tk.StringVar(value=value)
+                self.string_vars[xpath] = string_var
+                
+                # Verifica se è un campo data
+                if xpath in date_fields:
+                    # Usa il metodo create_date_field per creare il campo data
+                    date_frame, entry_widget = self.create_date_field(section_frame, value, width=28)
+                    date_frame.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                else:
+                    # Trattamento speciale per i campi Comune, Provincia e CAP
+                    if "Comune" in label and section_title in ["Cedente/Prestatore", "Cessionario/Committente"]:
+                        # Salva il riferimento alla variabile e xpath del comune
+                        comune_var = string_var
+                        comune_xpath = xpath
+                        comune_row = i
+                        # Crea un Entry normale per ora, sarà sostituito dopo
+                        entry_widget = tk.Entry(section_frame, width=30, textvariable=string_var)
+                        entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                        comune_widget = entry_widget
+                    elif "Provincia" in label and section_title in ["Cedente/Prestatore", "Cessionario/Committente"]:
+                        provincia_var = string_var
+                        provincia_xpath = xpath
+                        entry_widget = tk.Entry(section_frame, width=30, textvariable=string_var)
+                        entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    elif "CAP" in label and section_title in ["Cedente/Prestatore", "Cessionario/Committente"]:
+                        cap_var = string_var
+                        cap_xpath = xpath
+                        entry_widget = tk.Entry(section_frame, width=30, textvariable=string_var)
+                        entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    else:
+                        # Per i campi normali, usa Entry standard con StringVar
+                        entry_widget = tk.Entry(section_frame, width=30, textvariable=string_var)
+                        entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                
                 self.edit_fields[xpath] = {"widget": entry_widget, "element": element}
                 self.edit_widgets.extend([label_widget, entry_widget])
+                
+                # Configura ridimensionamento
+                section_frame.columnconfigure(1, weight=1)
+            
+            # Dopo aver creato tutti i campi nella sezione, se abbiamo trovato i campi necessari
+            # per l'autocompletamento, sostituisci il widget del comune
+            if comune_var and provincia_var and cap_var and comune_widget and comune_row is not None:
+                # Rimuovi il vecchio widget
+                comune_widget.destroy()
+                
+                # Crea il nuovo widget di autocompletamento
+                autocomplete = AutocompleteComune(section_frame, comune_var, provincia_var, cap_var, width=28)
+                autocomplete.frame.grid(row=comune_row, column=1, sticky="ew", padx=5, pady=2)
+                
+                # Aggiorna il riferimento nel dizionario edit_fields
+                if comune_xpath:
+                    # Aggiorna il riferimento al widget
+                    self.edit_fields[comune_xpath]["widget"] = autocomplete.comune_entry
+                
+                # Aggiungi alla lista dei widget da distruggere
+                self.edit_widgets.append(autocomplete.frame)
+                
+                # Log per debug
+                self.log(f"Abilitato autocompletamento comuni per la sezione {section_title}")
+        
+        # Popola la colonna destra
+        for section_title, fields in right_sections:
+            section_frame = tk.LabelFrame(right_column, text=section_title)
+            section_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+            self.edit_widgets.append(section_frame)
+            
+            # Variabili di riferimento per i campi dati riepilogo
+            self.aliquota_iva_widget = None
+            self.imponibile_widget = None
+            self.imposta_widget = None
+            
+            for i, (xpath, label) in enumerate(fields):
+                element, value = self.try_find_element(xpath, self.NS)
+                label_widget = tk.Label(section_frame, text=label + ":")
+                label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
+                
+                # Per AliquotaIVA creiamo un Combobox invece di un Entry
+                if "AliquotaIVA" in xpath:
+                    entry_widget = ttk.Combobox(section_frame, width=29, state="readonly")
+                    entry_widget['values'] = aliquote_iva
+                    
+                    # Trova il valore corrispondente nella lista o seleziona quello più vicino
+                    if value in aliquote_iva:
+                        entry_widget.set(value)
+                    else:
+                        # Se non troviamo un match esatto, cerchiamo il più vicino
+                        try:
+                            if value:
+                                val_float = float(value)
+                                closest = min(aliquote_iva, key=lambda x: abs(float(x) - val_float))
+                                entry_widget.set(closest)
+                            else:
+                                # Default a 22% se non c'è un valore
+                                entry_widget.set("22.00")
+                        except:
+                            # In caso di errore, default a 22%
+                            entry_widget.set("22.00")                 
+                    
+                    entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    
+                    # Se siamo nella sezione Dati Riepilogo, tieni traccia del widget
+                    if section_title == "Dati Riepilogo":
+                        self.aliquota_iva_widget = entry_widget
+                    
+                # Verifica se è un campo data
+                elif xpath in date_fields:
+                    # Usa il metodo create_date_field per creare il campo data
+                    date_frame, entry_widget = self.create_date_field(section_frame, value, width=28)
+                    date_frame.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                else:
+                    # Per i campi normali, usa Entry standard
+                    entry_widget = tk.Entry(section_frame, width=30)
+                    entry_widget.insert(0, value)
+                    entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    
+                    # Tieni traccia dei campi imponibile e imposta nella sezione Dati Riepilogo
+                    if section_title == "Dati Riepilogo":
+                        if "ImponibileImporto" in xpath:
+                            self.imponibile_widget = entry_widget
+                        elif "Imposta" in xpath:
+                            self.imposta_widget = entry_widget
+                
+                self.edit_fields[xpath] = {"widget": entry_widget, "element": element}
+                self.edit_widgets.extend([label_widget, entry_widget])
+                
+                # Configura ridimensionamento
+                section_frame.columnconfigure(1, weight=1)
+                
+            # Se siamo nella sezione Dati Riepilogo e abbiamo i riferimenti necessari,
+            # configura il calcolo automatico dell'imposta
+            if section_title == "Dati Riepilogo" and self.aliquota_iva_widget and self.imponibile_widget and self.imposta_widget:
+                # Crea una variabile per tracciare le modifiche
+                self.aliquota_var = tk.StringVar()
+                self.aliquota_var.set(self.aliquota_iva_widget.get())  # Valore iniziale
+                self.aliquota_iva_widget.config(textvariable=self.aliquota_var)
+                
+                # Doppio binding: sia all'evento che alla variabile
+                self.aliquota_iva_widget.bind("<<ComboboxSelected>>", self.calcola_imposta)
+                self.aliquota_var.trace_add("write", lambda *args: self.calcola_imposta())
+                
+                # Evento per l'imponibile quando perde il focus
+                self.imponibile_widget.bind("<FocusOut>", self.calcola_imposta)
+                
+                # Evento per l'imponibile quando viene premuto Invio
+                self.imponibile_widget.bind("<Return>", self.calcola_imposta)
+                
+                # Colora di grigio chiaro il campo imposta per indicare che è calcolato automaticamente
+                self.imposta_widget.config(bg="#f0f0f0")
+                
+                # Aggiungi un tooltip visibile
+                imposta_label = [lbl for lbl in section_frame.winfo_children() 
+                                if isinstance(lbl, tk.Label) and "Imposta" in lbl["text"]][0]
+                imposta_label.config(text="Imposta (auto):")
+                
+                # Esegui il calcolo iniziale dopo un breve ritardo
+                self.after(800, self.calcola_imposta)
+        
+        # Linee di dettaglio come riga estesa sotto entrambe le colonne
+        detail_row = 1
         
         # Aggiorna i dati delle linee
         self.refresh_lines_data()
         
         # Gestione dei campi per DettaglioLinee
-        self.line_row = row
+        self.line_row = detail_row
         self.current_line_index = 0
         
         if not hasattr(self, 'total_lines') or self.total_lines == 0:
@@ -317,12 +641,17 @@ class FatturaViewer(tk.Tk):
         
         self.log(f"Trovate {self.total_lines} linee di dettaglio normali")
         
-        self.update_line_fields()
-        row += 1
-
+        # Frame per linee di dettaglio che si estende a larghezza completa
+        details_full_width = tk.Frame(self.editor_scrollable_frame)
+        details_full_width.grid(row=detail_row, column=0, sticky="ew", padx=10, pady=5)
+        self.edit_widgets.append(details_full_width)
+        
+        # Crea i campi per la linea di dettaglio corrente
+        self.update_line_fields(details_full_width)
+        
         # Checkbox per la linea CONAI
         conai_frame = tk.Frame(self.editor_scrollable_frame)
-        conai_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=(10, 5))
+        conai_frame.grid(row=detail_row+1, column=0, sticky="ew", padx=10, pady=5)
         self.edit_widgets.append(conai_frame)
 
         self.conai_var = tk.BooleanVar()
@@ -334,27 +663,38 @@ class FatturaViewer(tk.Tk):
         conai_check.pack(side=tk.LEFT)
         self.edit_widgets.append(conai_check)
 
-        row += 1
-
+        # Frame di navigazione
         nav_frame = tk.Frame(self.editor_scrollable_frame)
-        nav_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10)
+        nav_frame.grid(row=detail_row+2, column=0, sticky="ew", padx=10)
         self.edit_widgets.append(nav_frame)
-        
-        row += 1
         
         def prev_line():
             if self.current_line_index > 0:
+                # Memorizza la posizione attuale dello scrolling
+                current_scroll_position = self.editor_canvas.yview()
+                
                 self.save_current_line_data()
                 self.current_line_index -= 1
-                self.update_line_fields()
+                self.update_line_fields(details_full_width)
                 self.update_nav_buttons()
+                
+                # Ripristina la posizione dello scrolling dopo l'aggiornamento
+                self.editor_canvas.update_idletasks()  # Assicura che tutti gli aggiornamenti del layout siano completi
+                self.editor_canvas.yview_moveto(current_scroll_position[0])
         
         def next_line():
             if self.current_line_index < self.total_lines - 1:
+                # Memorizza la posizione attuale dello scrolling
+                current_scroll_position = self.editor_canvas.yview()
+                
                 self.save_current_line_data()
                 self.current_line_index += 1
-                self.update_line_fields()
+                self.update_line_fields(details_full_width)
                 self.update_nav_buttons()
+                
+                # Ripristina la posizione dello scrolling dopo l'aggiornamento
+                self.editor_canvas.update_idletasks()  # Assicura che tutti gli aggiornamenti del layout siano completi
+                self.editor_canvas.yview_moveto(current_scroll_position[0])
 
         self.prev_btn = tk.Button(nav_frame, text="◀ Prec", command=prev_line)
         self.prev_btn.pack(side=tk.LEFT, padx=5)
@@ -377,69 +717,49 @@ class FatturaViewer(tk.Tk):
         recalc_btn.pack(side=tk.RIGHT, padx=5)
         self.edit_widgets.append(recalc_btn)
                 
-        
         self.update_nav_buttons()
         
-        riepilogo_frame = tk.LabelFrame(self.editor_scrollable_frame, text="Dati Riepilogo")
-        riepilogo_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
-        self.edit_widgets.append(riepilogo_frame)
-        row += 1
+        # Frame per i pulsanti centrati in basso
+        buttons_frame = tk.Frame(self.editor_scrollable_frame)
+        buttons_frame.grid(row=detail_row+3, column=0, sticky="ew", padx=10, pady=15)
+        self.edit_widgets.append(buttons_frame)
         
-        riepilogo_fields = [
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/AliquotaIVA", "Aliquota IVA"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/ImponibileImporto", "Imponibile"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Imposta", "Imposta"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/EsigibilitaIVA", "Esigibilità IVA")
-        ]
+        # Contenitore per centrare i pulsanti
+        centered_buttons = tk.Frame(buttons_frame)
+        centered_buttons.pack(fill=tk.X)
+        self.edit_widgets.append(centered_buttons)
         
-        for i, (xpath, label) in enumerate(riepilogo_fields):
-            element, value = self.try_find_element(xpath, self.NS)
-            label_widget = tk.Label(riepilogo_frame, text=label + ":")
-            label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
-            entry_widget = tk.Entry(riepilogo_frame, width=40)
-            entry_widget.insert(0, value)
-            entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
-            self.edit_fields[xpath] = {"widget": entry_widget, "element": element}
-            self.edit_widgets.extend([label_widget, entry_widget])
+        # Spazio vuoto a sinistra per centrare
+        left_spacer = tk.Frame(centered_buttons)
+        left_spacer.pack(side=tk.LEFT, expand=True)
         
-        pagamento_frame = tk.LabelFrame(self.editor_scrollable_frame, text="Dati Pagamento")
-        pagamento_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
-        self.edit_widgets.append(pagamento_frame)
-        row += 1
+        # Pulsanti centrati
+        self.cancel_btn = tk.Button(centered_buttons, text="Annulla", command=self.cancel_edit,
+                                    padx=20, pady=8, font=("", 10))
+        self.cancel_btn.pack(side=tk.LEFT, padx=10)
         
-        pagamento_fields = [
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/CondizioniPagamento", "Condizioni Pagamento"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/ModalitaPagamento", "Modalità Pagamento"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/DataScadenzaPagamento", "Data Scadenza"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/ImportoPagamento", "Importo Pagamento"),
-            ("//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/CodicePagamento", "Codice Pagamento")
-        ]
+        self.save_btn = tk.Button(centered_buttons, text="Salva XML", command=self.save_xml,
+                                bg="#FFC107", fg="black", padx=20, pady=8, font=("", 10, "bold"))
+        self.save_btn.pack(side=tk.LEFT, padx=10)
         
-        for i, (xpath, label) in enumerate(pagamento_fields):
-            element, value = self.try_find_element(xpath, self.NS)
-            label_widget = tk.Label(pagamento_frame, text=label + ":")
-            label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
-            entry_widget = tk.Entry(pagamento_frame, width=40)
-            entry_widget.insert(0, value)
-            entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
-            self.edit_fields[xpath] = {"widget": entry_widget, "element": element}
-            self.edit_widgets.extend([label_widget, entry_widget])
+        # Spazio vuoto a destra per centrare
+        right_spacer = tk.Frame(centered_buttons)
+        right_spacer.pack(side=tk.RIGHT, expand=True)
         
-        tree_btn_frame = tk.Frame(self.editor_scrollable_frame)
-        tree_btn_frame.grid(row=row, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
-        self.edit_widgets.append(tree_btn_frame)
-        
-        tree_btn = tk.Button(tree_btn_frame, text="Visualizza struttura XML completa", 
+        # Pulsante per visualizzare la struttura XML
+        tree_btn = tk.Button(buttons_frame, text="Visualizza struttura XML completa", 
                             command=self.show_xml_tree, bg="#607D8B", fg="white", padx=10, pady=5)
-        tree_btn.pack(pady=5)
+        tree_btn.pack(side=tk.BOTTOM, pady=(10, 0))
         self.edit_widgets.append(tree_btn)
+        
+        # Aggiorna i totali nel riepilogo
+        self.update_riepilogo_totals()
         
         self.editor_scrollable_frame.update_idletasks()
         self.editor_canvas.config(width=self.editor_scrollable_frame.winfo_reqwidth())
 
 
-
-
+        
     def on_line_field_change(self, event, xpath):
         if self.current_line_index not in self.line_modifications:
             self.line_modifications[self.current_line_index] = {}
@@ -515,6 +835,9 @@ class FatturaViewer(tk.Tk):
                 messagebox.showerror("Errore", f"Errore nel salvataggio del file:\n{str(e)}")
     
     def cancel_edit(self):
+        # Rimuovi il binding della rotellina del mouse
+        self.unbind_all("<MouseWheel>")
+        
         self.editor_frame.pack_forget()
         self.log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.log("Modalità modifica disattivata")
@@ -596,12 +919,20 @@ class FatturaViewer(tk.Tk):
         self.line_label.config(text=f"Linea {self.current_line_index + 1} di {self.total_lines}")
 
 
-    def update_line_fields(self):
+    def update_line_fields(self, parent_frame=None):
+        # Se parent_frame è None, usa self.editor_scrollable_frame
+        if parent_frame is None:
+            parent_frame = self.editor_scrollable_frame
+        
+        # Determina il gestore di geometria da utilizzare
+        # Se parent_frame è nel editor_scrollable_frame, usa grid, altrimenti pack
+        using_grid = parent_frame == self.editor_scrollable_frame
+        
         # Rimuovi il vecchio frame se esiste
         if hasattr(self, 'line_frame') and self.line_frame in self.edit_widgets:
             self.line_frame.destroy()
             self.edit_widgets.remove(self.line_frame)
-
+        
         # Rimuovi vecchi campi delle linee di dettaglio
         for key in list(self.edit_fields.keys()):
             if "DettaglioLinee" in key:
@@ -611,9 +942,15 @@ class FatturaViewer(tk.Tk):
         self.refresh_lines_data()
         
         # Crea il nuovo frame
-        self.line_frame = tk.LabelFrame(self.editor_scrollable_frame, 
+        self.line_frame = tk.LabelFrame(parent_frame, 
                                     text=f"Dettaglio Linea {self.current_line_index + 1} di {self.total_lines}")
-        self.line_frame.grid(row=self.line_row, column=0, columnspan=2, sticky="ew", padx=10, pady=5)
+        
+        # Usa il gestore di geometria appropriato
+        if using_grid:
+            self.line_frame.grid(row=self.line_row, column=0, sticky="ew", padx=10, pady=5)
+        else:
+            self.line_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+            
         self.edit_widgets.append(self.line_frame)
         
         # Se non ci sono linee normali, mostra un messaggio
@@ -634,6 +971,14 @@ class FatturaViewer(tk.Tk):
             ("PrezzoTotale", "Prezzo Totale"),
             ("AliquotaIVA", "Aliquota IVA")
         ]
+        
+        # Valori possibili per Aliquota IVA
+        aliquote_iva = ["4.00", "5.00", "10.00", "22.00"]
+        
+        # Crea un frame a griglia per i campi di dettaglio per una migliore organizzazione
+        line_grid = tk.Frame(self.line_frame)
+        line_grid.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.edit_widgets.append(line_grid)
         
         # Variabili per tenere traccia dei widget specifici
         quantita_widget = None
@@ -717,45 +1062,113 @@ class FatturaViewer(tk.Tk):
                 widget.config(bg="#ffcccc")  # Sfondo rosso chiaro
                 self.log(f"Errore nella formattazione del campo: {str(e)}")
         
-        # Crea i campi
-        for i, (field_name, label) in enumerate(fields):
+        # Layout dei campi su più righe
+        row = 0
+        
+        # Prima riga: Numero Linea
+        numero_label = tk.Label(line_grid, text="Numero Linea:")
+        numero_label.grid(row=row, column=0, sticky="w", padx=5, pady=5)
+        
+        numero_element = current_line.find("NumeroLinea")
+        numero_value = numero_element.text if numero_element is not None else ""
+        
+        numero_entry = tk.Entry(line_grid, width=15)
+        numero_entry.insert(0, numero_value)
+        numero_entry.grid(row=row, column=1, sticky="w", padx=5, pady=5)
+        
+        # Memorizza il riferimento al campo e all'elemento XML
+        self.edit_fields[f"current_line.NumeroLinea"] = {"widget": numero_entry, "element": numero_element}
+        self.edit_widgets.extend([numero_label, numero_entry])
+        
+        row += 1
+        
+        # Seconda riga: Descrizione
+        descrizione_label = tk.Label(line_grid, text="Descrizione:")
+        descrizione_label.grid(row=row, column=0, sticky="w", padx=5, pady=5)
+        
+        descrizione_element = current_line.find("Descrizione")
+        descrizione_value = descrizione_element.text if descrizione_element is not None else ""
+        
+        descrizione_entry = tk.Entry(line_grid, width=80)
+        descrizione_entry.insert(0, descrizione_value)
+        descrizione_entry.grid(row=row, column=1, columnspan=5, sticky="ew", padx=5, pady=5)
+        
+        # Memorizza il riferimento al campo e all'elemento XML
+        self.edit_fields[f"current_line.Descrizione"] = {"widget": descrizione_entry, "element": descrizione_element}
+        self.edit_widgets.extend([descrizione_label, descrizione_entry])
+        
+        row += 1
+        
+        # Organizziamo gli altri campi in 2 righe di 3 colonne ciascuna
+        col = 0
+        for field_name, label in fields:
+            # Saltiamo NumeroLinea e Descrizione che abbiamo già gestito
+            if field_name in ["NumeroLinea", "Descrizione"]:
+                continue
+                
+            label_widget = tk.Label(line_grid, text=label + ":")
+            label_widget.grid(row=row, column=col*2, sticky="w", padx=5, pady=2)
+            
             element = current_line.find(field_name)
             value = element.text if element is not None else ""
             
-            label_widget = tk.Label(self.line_frame, text=label + ":")
-            label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
-            
-            entry_widget = tk.Entry(self.line_frame, width=40)
-            
-            # Applica validazione per campi numerici
-            if field_name in ["Quantita", "PrezzoUnitario", "PrezzoTotale"]:
-                # Salva il nome del campo nel widget per poterlo recuperare nel validatore
-                entry_widget.field_name = field_name
+            # Per AliquotaIVA creiamo un Combobox invece di un Entry
+            if field_name == "AliquotaIVA":
+                entry_widget = ttk.Combobox(line_grid, width=14, state="readonly")
+                entry_widget['values'] = aliquote_iva
                 
-                # Crea un validatore specifico per questo campo
-                vcmd = self.register(lambda text, fname=field_name: validate_numeric_field(fname, text))
-                entry_widget.config(validate="key", validatecommand=(vcmd, '%P'))
-                entry_widget.bind("<FocusOut>", format_numeric_field)
-                
-                # Formatta il valore iniziale
-                if value:
+                # Trova il valore corrispondente nella lista o seleziona quello più vicino
+                if value in aliquote_iva:
+                    entry_widget.set(value)
+                else:
+                    # Se non troviamo un match esatto, cerchiamo il più vicino
                     try:
-                        # Converte il valore esistente nel formato corretto
-                        if '.' in value:
-                            int_part, dec_part = value.split('.')
-                            # Rimuovi zeri iniziali dalla parte intera (tranne lo zero da solo)
-                            if int_part != "0":
-                                int_part = int_part.lstrip("0") or "0"
-                            # Formatta con esattamente 7 decimali
-                            dec_part = (dec_part + "0000000")[:7]
-                            value = f"{int_part}.{dec_part}"
+                        if value:
+                            val_float = float(value)
+                            closest = min(aliquote_iva, key=lambda x: abs(float(x) - val_float))
+                            entry_widget.set(closest)
                         else:
-                            value = f"{value.lstrip('0') or '0'}.0000000"
+                            # Default a 22% se non c'è un valore
+                            entry_widget.set("22.00")
                     except:
-                        value = "0.0000000"
+                        # In caso di errore, default a 22%
+                        entry_widget.set("22.00")
+
+
+
+            else:
+                entry_widget = tk.Entry(line_grid, width=15)
+                
+                # Applica validazione per campi numerici
+                if field_name in ["Quantita", "PrezzoUnitario", "PrezzoTotale"]:
+                    # Salva il nome del campo nel widget per poterlo recuperare nel validatore
+                    entry_widget.field_name = field_name
+                    
+                    # Crea un validatore specifico per questo campo
+                    vcmd = self.register(lambda text, fname=field_name: validate_numeric_field(fname, text))
+                    entry_widget.config(validate="key", validatecommand=(vcmd, '%P'))
+                    entry_widget.bind("<FocusOut>", format_numeric_field)
+                    
+                    # Formatta il valore iniziale
+                    if value:
+                        try:
+                            # Converte il valore esistente nel formato corretto
+                            if '.' in value:
+                                int_part, dec_part = value.split('.')
+                                # Rimuovi zeri iniziali dalla parte intera (tranne lo zero da solo)
+                                if int_part != "0":
+                                    int_part = int_part.lstrip("0") or "0"
+                                # Formatta con esattamente 7 decimali
+                                dec_part = (dec_part + "0000000")[:7]
+                                value = f"{int_part}.{dec_part}"
+                            else:
+                                value = f"{value.lstrip('0') or '0'}.0000000"
+                        except:
+                            value = "0.0000000"
+                
+                entry_widget.insert(0, value)
             
-            entry_widget.insert(0, value)
-            entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+            entry_widget.grid(row=row, column=col*2+1, sticky="ew", padx=5, pady=2)
             
             # Memorizza il riferimento al campo e all'elemento XML
             field_key = f"current_line.{field_name}"
@@ -769,8 +1182,17 @@ class FatturaViewer(tk.Tk):
                 prezzo_unitario_widget = entry_widget
             elif field_name == "PrezzoTotale":
                 prezzo_totale_widget = entry_widget
-                # Il prezzo totale viene calcolato automaticamente, quindi possiamo disabilitarlo
-                # entry_widget.config(state="readonly", readonlybackground="#f0f0f0")
+            
+            # Aggiorna la posizione per il prossimo campo
+            col += 1
+            if col >= 3:  # 3 colonne per riga
+                col = 0
+                row += 1
+        
+        # Configura il ridimensionamento delle colonne
+        for i in range(6):  # 6 colonne (3 coppie di label/entry)
+            if i % 2 == 1:  # Colonne dei widget Entry
+                line_grid.columnconfigure(i, weight=1)
         
         # Configura il calcolo automatico del prezzo totale
         if quantita_widget and prezzo_unitario_widget and prezzo_totale_widget:
@@ -798,8 +1220,8 @@ class FatturaViewer(tk.Tk):
                                 field_data["element"].text = prezzo_totale_formatted
                                 break
                         
-                        # AGGIUNGI QUESTA RIGA: Aggiorna i totali nel riepilogo
-                        self.after(100, self.update_riepilogo_totals)  # Usa after per evitare problemi di timing
+                        # Aggiorna i totali nel riepilogo
+                        self.after(100, self.update_riepilogo_totals)
                                                 
                 except (ValueError, AttributeError) as e:
                     # In caso di errore nel parsing dei numeri, non fare nulla
@@ -819,7 +1241,7 @@ class FatturaViewer(tk.Tk):
             
             # Calcola il prezzo totale iniziale
             calculate_total_price()
-
+            
     def save_current_line_data(self):
         line_data = {}
         
@@ -1124,7 +1546,55 @@ class FatturaViewer(tk.Tk):
         except Exception as e:
             self.log(f"Errore nell'aggiornamento dei totali: {str(e)}")
             traceback.print_exc() 
+
+
+
+    def calcola_imposta(self, event=None):
+        """
+        Metodo per calcolare l'imposta in base all'aliquota e all'imponibile.
+        Può essere chiamato sia manualmente che dagli eventi dell'interfaccia.
+        """
+        try:
+            # Verifico che i widget siano disponibili
+            if not all([self.aliquota_iva_widget, self.imponibile_widget, self.imposta_widget]):
+                self.log("Widget non disponibili per il calcolo dell'imposta")
+                return
+                
+            # Ottieni i valori dai campi
+            aliquota_str = self.aliquota_iva_widget.get()
+            imponibile_str = self.imponibile_widget.get().replace(',', '.')
             
+            # Log per debug
+            self.log(f"Calcolando imposta con aliquota: {aliquota_str}, imponibile: {imponibile_str}")
+            
+            # Verifica che i valori non siano vuoti
+            if aliquota_str and imponibile_str:
+                aliquota = float(aliquota_str)
+                imponibile = float(imponibile_str)
+                
+                # Calcola l'imposta
+                imposta = (imponibile * aliquota) / 100.0
+                
+                # Formatta il risultato con 2 decimali
+                imposta_formatted = f"{imposta:.2f}"
+                
+                # Aggiorna il campo imposta
+                self.imposta_widget.delete(0, tk.END)
+                self.imposta_widget.insert(0, imposta_formatted)
+                
+                # Aggiorna anche l'elemento XML corrispondente
+                for xpath, field_data in self.edit_fields.items():
+                    if "Imposta" in xpath and field_data["element"] is not None:
+                        field_data["element"].text = imposta_formatted
+                        break
+                
+                # Aggiorna anche l'importo totale documento
+                self.update_riepilogo_totals()
+                
+                self.log(f"Imposta ricalcolata: {imposta_formatted}")
+        except Exception as e:
+            self.log(f"Errore nel calcolo dell'imposta: {str(e)}")
+            traceback.print_exc()        
             
 if __name__ == "__main__":
     app = FatturaViewer()
