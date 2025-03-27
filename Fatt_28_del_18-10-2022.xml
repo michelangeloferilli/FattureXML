@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>
+<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">
+	<FatturaElettronicaHeader>
+		<DatiTrasmissione>
+			<IdTrasmittente>
+				<IdPaese>IT</IdPaese>
+				<IdCodice>05006900962</IdCodice>
+			</IdTrasmittente>
+			<ProgressivoInvio>     E5AcS</ProgressivoInvio>
+			<FormatoTrasmissione>FPR12</FormatoTrasmissione>
+			<CodiceDestinatario>0000000</CodiceDestinatario>
+		</DatiTrasmissione>
+		<CedentePrestatore>
+			<DatiAnagrafici>
+				<IdFiscaleIVA>
+					<IdPaese>IT</IdPaese>
+					<IdCodice>16102340011</IdCodice>
+				</IdFiscaleIVA>
+				<Anagrafica>
+					<Denominazione>Silvia Marchesi &amp; C. snc</Denominazione>
+				</Anagrafica>
+				<RegimeFiscale>RF01</RegimeFiscale>
+			</DatiAnagrafici>
+			<Sede>
+				<Indirizzo>Via Nazionale n. 129</Indirizzo>
+				<CAP>10121</CAP>
+				<Comune>Torino</Comune>
+				<Provincia>TO</Provincia>
+				<Nazione>IT</Nazione>
+			</Sede>
+			<IscrizioneREA>
+				<Ufficio>TO</Ufficio>
+				<NumeroREA>16102340011</NumeroREA>
+				<SocioUnico>SM</SocioUnico>
+				<StatoLiquidazione>LN</StatoLiquidazione>
+			</IscrizioneREA>
+		</CedentePrestatore>
+		<CessionarioCommittente>
+			<DatiAnagrafici>
+				<IdFiscaleIVA>
+					<IdPaese>IT</IdPaese>
+					<IdCodice>08541347921</IdCodice>
+				</IdFiscaleIVA>
+				<CodiceFiscale>RSSMRA69H25F205H</CodiceFiscale>
+				<Anagrafica>
+					<Denominazione>Impresa Comm. Individuale Mario Rossi</Denominazione>
+				</Anagrafica>
+			</DatiAnagrafici>
+			<Sede>
+				<Indirizzo>Via Garibaldi 5</Indirizzo>
+				<CAP>40124</CAP>
+				<Comune>Bologna</Comune>
+				<Provincia>BO</Provincia>
+				<Nazione>IT</Nazione>
+			</Sede>
+		</CessionarioCommittente>
+	</FatturaElettronicaHeader>
+	<FatturaElettronicaBody>
+		<DatiGenerali>
+			<DatiGeneraliDocumento>
+				<TipoDocumento>TD01</TipoDocumento>
+				<Divisa>EUR</Divisa>
+				<Data>2022-10-18</Data>
+				<Numero>28</Numero>
+				<ImportoTotaleDocumento>6100.00</ImportoTotaleDocumento>
+			</DatiGeneraliDocumento>
+		</DatiGenerali>
+		<DatiBeniServizi>
+			<DettaglioLinee>
+				<NumeroLinea>1</NumeroLinea>
+				<Descrizione>Tuta allenamento (cod. art. TU22)</Descrizione>
+				<Quantita>150.0000000</Quantita>
+				<UnitaMisura>NR</UnitaMisura>
+				<PrezzoUnitario>20.0000000</PrezzoUnitario>
+				<PrezzoTotale>3000.0000000</PrezzoTotale>
+				<AliquotaIVA>22.00</AliquotaIVA>
+			</DettaglioLinee>
+			<DettaglioLinee>
+				<NumeroLinea>2</NumeroLinea>
+				<Descrizione>K-Way (cod. art. KW02)</Descrizione>
+				<Quantita>250.0000000</Quantita>
+				<UnitaMisura>NR</UnitaMisura>
+				<PrezzoUnitario>8.0000000</PrezzoUnitario>
+				<PrezzoTotale>2000.0000000</PrezzoTotale>
+				<AliquotaIVA>22.00</AliquotaIVA>
+			</DettaglioLinee>
+			<DettaglioLinee>
+				<NumeroLinea>3</NumeroLinea>
+				<Descrizione>CONTRIBUTO CONAI ASSOLTO</Descrizione>
+				<PrezzoUnitario>0.0000000</PrezzoUnitario>
+				<PrezzoTotale>0.0000000</PrezzoTotale>
+				<AliquotaIVA>22.00</AliquotaIVA>
+			</DettaglioLinee>
+			<DatiRiepilogo>
+				<AliquotaIVA>22.00</AliquotaIVA>
+				<ImponibileImporto>5000.00</ImponibileImporto>
+				<Imposta>1100.00</Imposta>
+				<EsigibilitaIVA>I</EsigibilitaIVA>
+			</DatiRiepilogo>
+		</DatiBeniServizi>
+		<DatiPagamento>
+			<CondizioniPagamento>TP02</CondizioniPagamento>
+			<DettaglioPagamento>
+				<ModalitaPagamento>MP12</ModalitaPagamento>
+				<DataScadenzaPagamento>2022-11-17</DataScadenzaPagamento>
+				<ImportoPagamento>6100.00</ImportoPagamento>
+				<CodicePagamento>RB01</CodicePagamento>
+			</DettaglioPagamento>
+		</DatiPagamento>
+	</FatturaElettronicaBody>
+</p:FatturaElettronica>
