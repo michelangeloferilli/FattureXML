@@ -26,7 +26,9 @@ class ExcelXmlManager:
         """
         self.parent = parent
         self.NS = ns
-        self.excel_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "FattureXML.xlsx")
+        
+        # Aggiungi opzione per specificare il file Excel più tardi
+        self.excel_path = None
         
         # Nomi dei fogli Excel
         self.master_sheet_name = "Fatture"
@@ -56,7 +58,11 @@ class ExcelXmlManager:
         """
         if excel_path:
             self.excel_path = excel_path
-        
+        # Verifica che il percorso del file Excel sia stato impostato
+        if not self.excel_path:
+            self.log("Errore: Nessun file Excel specificato. Usa prima 'Carica DB Excel' o 'Crea DB Excel'.")
+            return False
+            
         try:
             root = xml_doc.getroot()
             
@@ -337,7 +343,8 @@ class ExcelXmlManager:
     
     def _extract_xml_structure(self, root):
         """
-        Estrae la struttura dell'XML per documentazione
+        Estrae la struttura dell'XML per documentazione,
+        evitando duplicazioni per elementi ripetuti come DettaglioLinee
         
         Args:
             root: Elemento radice XML
@@ -346,41 +353,73 @@ class ExcelXmlManager:
             list: Lista di tuple (tag, percorso, descrizione)
         """
         structure = []
+        # Teniamo traccia dei percorsi già aggiunti
+        added_paths = set()
         
         # Dizionario di descrizioni dei tag
         tag_descriptions = self._get_tag_descriptions()
         
+        # Lista di tag che possono apparire più volte con lo stesso parent
+        repeatable_tags = ["DettaglioLinee", "DatiRiepilogo"]
+        
         # Funzione ricorsiva per esplorare l'albero XML
-        def explore_node(node, path=""):
+        def explore_node(node, path="", avoid_children=False):
             tag = self._get_tag_name(node)
             current_path = f"{path}/{tag}" if path else tag
             
+            # Se il percorso è già stato aggiunto o deve essere saltato, esci subito
+            if current_path in added_paths:
+                return
+            
             # Aggiungi il nodo corrente alla struttura
             description = tag_descriptions.get(tag, "")
-            structure.append([tag, current_path, description])
             
-            # Esplora ricorsivamente i figli
+            # Aggiungi un'indicazione se il tag è ripetibile
+            if tag in repeatable_tags:
+                description += " (Elemento ripetibile, gestito in foglio separato)"
+            
+            structure.append([tag, current_path, description])
+            added_paths.add(current_path)
+            
+            # Non continuare con i figli di un nodo ripetibile per evitare duplicazioni
+            if avoid_children:
+                return
+                
+            # Esplora i figli solo se non è un nodo ripetibile
             for child in node:
                 child_tag = self._get_tag_name(child)
                 
-                # Evita duplicati per nodi ripetuti (es. DettaglioLinee[1], DettaglioLinee[2], ...)
-                child_path = current_path
-                if node.xpath(f"count(./{child_tag})", namespaces=self.NS) > 1:
-                    child_path = f"{current_path}[n]"
+                # Verifica se è un elemento ripetibile
+                is_repeatable = child_tag in repeatable_tags
+                
+                # Se troviamo un elemento ripetibile, lo gestiamo diversamente
+                if is_repeatable:
+                    # Costruisci il percorso per l'elemento ripetibile
+                    child_path = f"{current_path}/{child_tag}"
                     
-                    # Aggiungi solo se non è già stato aggiunto (evita DettaglioLinee[1], DettaglioLinee[2], ...)
-                    if not any(item[1] == child_path for item in structure):
-                        explore_node(child, child_path)
+                    # Lo aggiungiamo solo se non l'abbiamo già fatto
+                    if child_path not in added_paths:
+                        description = tag_descriptions.get(child_tag, "")
+                        description += " (Elemento ripetibile, gestito in foglio separato)"
+                        structure.append([child_tag, child_path, description])
+                        added_paths.add(child_path)
+                        
+                        # Esplora il primo figlio per capire la struttura interna
+                        # ma evita di aggiungere altri nodi con lo stesso tag
+                        explore_node(child, current_path, True)
                 else:
-                    explore_node(child, current_path)
+                    # Per elementi non ripetibili, esplorazione normale
+                    explore_node(child, current_path, False)
         
         try:
             explore_node(root)
         except Exception as e:
             self.log(f"Errore nell'estrazione della struttura XML: {str(e)}")
+            traceback.print_exc()
         
         return structure
-    
+
+
     def _get_tag_name(self, node):
         """
         Estrae il nome del tag senza namespace
@@ -480,86 +519,7 @@ class ExcelXmlManager:
             adjusted_width = max_length + 2 if max_length < 50 else 50
             sheet.column_dimensions[column_letter].width = adjusted_width
     
-    def create_xml_from_excel_by_id(self, invoice_id=None, output_xml_path=None):
-        """
-        Crea un nuovo XML a partire dai dati in Excel per un ID fattura specifico
-        
-        Args:
-            invoice_id: ID della fattura da creare (se None, viene mostrato un selettore)
-            output_xml_path: Percorso di output del nuovo XML (opzionale)
-        
-        Returns:
-            bool, str: (Successo, Percorso del file creato)
-        """
-        try:
-            # Verifica che il file Excel esista
-            if not os.path.exists(self.excel_path):
-                self.log(f"File Excel non trovato: {self.excel_path}")
-                messagebox.showerror("Errore", f"File Excel non trovato: {self.excel_path}")
-                return False, ""
-            
-            # Carica il workbook
-            wb = openpyxl.load_workbook(self.excel_path)
-            
-            # Verifica che i fogli necessari esistano
-            required_sheets = [self.master_sheet_name, self.details_sheet_name, 
-                              self.summary_sheet_name, self.structure_sheet_name]
-            for sheet_name in required_sheets:
-                if sheet_name not in wb.sheetnames:
-                    self.log(f"Foglio '{sheet_name}' non trovato nel file Excel")
-                    messagebox.showerror("Errore", f"Foglio '{sheet_name}' non trovato nel file Excel")
-                    return False, ""
-            
-            # Se non è specificato un ID, chiedi all'utente di selezionarlo
-            if invoice_id is None:
-                invoice_id = self._show_invoice_selector(wb[self.master_sheet_name])
-                if not invoice_id:
-                    self.log("Nessuna fattura selezionata")
-                    return False, ""
-            
-            # Se non è specificato un percorso di output, chiedi all'utente
-            if not output_xml_path:
-                output_xml_path = filedialog.asksaveasfilename(
-                    title="Salva il nuovo file XML",
-                    defaultextension=".xml",
-                    filetypes=[("File XML", "*.xml")]
-                )
-                if not output_xml_path:
-                    self.log("Operazione di creazione XML annullata dall'utente")
-                    return False, ""
-            
-            # Estrai i dati della fattura
-            invoice_data = self._get_invoice_data_by_id(wb, invoice_id)
-            if not invoice_data:
-                self.log(f"Dati non trovati per la fattura con ID: {invoice_id}")
-                messagebox.showerror("Errore", f"Dati non trovati per la fattura con ID: {invoice_id}")
-                return False, ""
-            
-            # Crea il documento XML
-            xml_doc = self._generate_xml_from_invoice_data(invoice_data)
-            
-            # Salva il file XML
-            xml_string = etree.tostring(xml_doc, pretty_print=True, encoding="UTF-8", 
-                                        xml_declaration=True).decode("utf-8")
-            
-            # Migliora formattazione per nodi ripetuti
-            xml_string = re.sub(r'(</DettaglioLinee>)(\r?\n)+(<(?:\w+:)?DatiRiepilogo>)', 
-                               r'\1\n      \3', xml_string)
-            xml_string = re.sub(r'(</DettaglioLinee>)(<(?:\w+:)?DatiRiepilogo>)', 
-                               r'\1\n      \2', xml_string)
-            
-            with open(output_xml_path, 'w', encoding='utf-8') as f:
-                f.write(xml_string)
-            
-            self.log(f"File XML creato con successo: {output_xml_path}")
-            return True, output_xml_path
-        
-        except Exception as e:
-            self.log(f"Errore nella creazione del file XML: {str(e)}")
-            traceback.print_exc()
-            messagebox.showerror("Errore", f"Errore nella creazione del file XML:\n{str(e)}")
-            return False, ""
-    
+
     def _show_invoice_selector(self, master_sheet):
         """
         Mostra un selettore per scegliere la fattura da esportare
@@ -570,89 +530,117 @@ class ExcelXmlManager:
         Returns:
             str: ID della fattura selezionata o None
         """
-        # Estrai l'elenco delle fatture
-        invoices = []
-        for row in range(2, master_sheet.max_row + 1):
-            invoice_id = master_sheet.cell(row=row, column=1).value
-            if not invoice_id:
-                continue
-                
-            numero = master_sheet.cell(row=row, column=2).value or ""
-            data = master_sheet.cell(row=row, column=3).value or ""
-            cedente = master_sheet.cell(row=row, column=6).value or ""
-            cessionario = master_sheet.cell(row=row, column=8).value or ""
+        try:
+            # Log per debugging
+            self.log("Avvio selettore fatture")
             
-            display_text = f"{numero} - {data} - {cedente} → {cessionario}"
-            invoices.append((invoice_id, display_text))
-        
-        if not invoices:
-            messagebox.showinfo("Informazione", "Nessuna fattura trovata nel foglio Excel")
-            return None
-        
-        # Crea una finestra di dialogo per la selezione
-        selector = tk.Toplevel()
-        selector.title("Seleziona Fattura")
-        selector.geometry("600x400")
-        selector.transient(self.parent)
-        selector.grab_set()
-        selector.focus_set()
-        
-        # Variabile per memorizzare l'ID selezionato
-        selected_id = None
-        
-        tk.Label(selector, text="Seleziona la fattura da esportare:", 
-                pady=10, font=("", 10, "bold")).pack(fill=tk.X)
-        
-        # Frame con listbox e scrollbar
-        list_frame = tk.Frame(selector)
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        scrollbar = tk.Scrollbar(list_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        listbox = tk.Listbox(list_frame, font=("", 10), height=15, 
-                           yscrollcommand=scrollbar.set)
-        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        scrollbar.config(command=listbox.yview)
-        
-        # Popola la listbox
-        for i, (invoice_id, display_text) in enumerate(invoices):
-            listbox.insert(tk.END, display_text)
-            listbox.itemconfig(i, {"invoice_id": invoice_id})
-        
-        # Frame per i pulsanti
-        btn_frame = tk.Frame(selector)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        def on_select():
-            nonlocal selected_id
-            selection = listbox.curselection()
-            if selection:
-                idx = selection[0]
-                selected_id = listbox.itemcget(idx, "invoice_id")
+            # Estrai l'elenco delle fatture
+            invoices = []
+            for row in range(2, master_sheet.max_row + 1):
+                invoice_id = master_sheet.cell(row=row, column=1).value
+                if not invoice_id:
+                    continue
+                    
+                numero = master_sheet.cell(row=row, column=2).value or ""
+                data = master_sheet.cell(row=row, column=3).value or ""
+                cedente = master_sheet.cell(row=row, column=6).value or ""
+                cessionario = master_sheet.cell(row=row, column=8).value or ""
+                
+                # Log dei valori per debug
+                self.log(f"Fattura trovata: ID={invoice_id}, Numero={numero}, Data={data}")
+                
+                display_text = f"{numero} - {data} - {cedente} → {cessionario}"
+                invoices.append((invoice_id, display_text))
+            
+            if not invoices:
+                self.log("Nessuna fattura trovata nel foglio Excel")
+                messagebox.showinfo("Informazione", "Nessuna fattura trovata nel foglio Excel")
+                return None
+            
+            # Log per debug
+            self.log(f"Trovate {len(invoices)} fatture")
+            
+            # Variabile per memorizzare l'ID selezionato
+            selected_id = None
+            
+            # Crea una finestra di dialogo per la selezione
+            selector = tk.Toplevel(self.parent)
+            selector.title("Seleziona Fattura")
+            selector.geometry("600x400")
+            selector.transient(self.parent)
+            selector.grab_set()
+            selector.focus_set()
+            
+            tk.Label(selector, text="Seleziona la fattura da esportare:", 
+                    pady=10, font=("", 10, "bold")).pack(fill=tk.X)
+            
+            # Frame con listbox e scrollbar
+            list_frame = tk.Frame(selector)
+            list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+            
+            scrollbar = tk.Scrollbar(list_frame)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            listbox = tk.Listbox(list_frame, font=("", 10), height=15, 
+                            yscrollcommand=scrollbar.set)
+            listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            scrollbar.config(command=listbox.yview)
+            
+            # Importante: memorizza gli ID in una lista separata per un accesso sicuro
+            invoice_ids = []
+            
+            # Popola la listbox
+            for i, (invoice_id, display_text) in enumerate(invoices):
+                listbox.insert(tk.END, display_text)
+                invoice_ids.append(invoice_id)  # Memorizza l'ID nella lista
+            
+            # Frame per i pulsanti
+            btn_frame = tk.Frame(selector)
+            btn_frame.pack(fill=tk.X, padx=10, pady=10)
+            
+            def on_select():
+                nonlocal selected_id
+                selection = listbox.curselection()
+                if selection:
+                    idx = selection[0]
+                    if 0 <= idx < len(invoice_ids):
+                        selected_id = invoice_ids[idx]  # Usa l'ID dalla lista
+                        self.log(f"Fattura selezionata: {selected_id}")
+                        selector.destroy()
+                
+            def on_cancel():
+                nonlocal selected_id
+                selected_id = None
+                self.log("Selezione fattura annullata")
                 selector.destroy()
-        
-        def on_cancel():
-            selector.destroy()
-        
-        # Pulsanti
-        select_btn = tk.Button(btn_frame, text="Seleziona", command=on_select,
-                              bg="#4CAF50", fg="white", width=15, pady=5)
-        select_btn.pack(side=tk.RIGHT, padx=5)
-        
-        cancel_btn = tk.Button(btn_frame, text="Annulla", command=on_cancel,
-                              width=15, pady=5)
-        cancel_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # Doppio click per selezionare
-        listbox.bind("<Double-1>", lambda e: on_select())
-        
-        # Attendi che la finestra venga chiusa
-        selector.wait_window()
-        
-        return selected_id
-    
+            
+            # Pulsanti
+            select_btn = tk.Button(btn_frame, text="Seleziona", command=on_select,
+                                bg="#4CAF50", fg="white", width=15, pady=5)
+            select_btn.pack(side=tk.RIGHT, padx=5)
+            
+            cancel_btn = tk.Button(btn_frame, text="Annulla", command=on_cancel,
+                                width=15, pady=5)
+            cancel_btn.pack(side=tk.RIGHT, padx=5)
+            
+            # Doppio click per selezionare
+            listbox.bind("<Double-1>", lambda e: on_select())
+            
+            # Attendi che la finestra venga chiusa
+            selector.wait_window()
+            
+            # Log dell'ID selezionato
+            self.log(f"ID selezionato finale: {selected_id}")
+            
+            return selected_id
+            
+        except Exception as e:
+            self.log(f"Errore nel selettore fatture: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nella selezione della fattura:\n{str(e)}")
+            return None
+
     def _get_invoice_data_by_id(self, workbook, invoice_id):
         """
         Estrae tutti i dati di una fattura specifica
@@ -703,6 +691,7 @@ class ExcelXmlManager:
         
         return invoice_data
 
+
     def _extract_xml_structure_from_sheet(self, structure_sheet):
         """
         Estrae la struttura XML dal foglio dedicato
@@ -721,7 +710,10 @@ class ExcelXmlManager:
             description = structure_sheet.cell(row=row, column=3).value
             
             if tag and path:
-                structure.append((tag, path, description or ""))
+                # Aggiungi solo se non è un duplicato di elementi ripetibili
+                # (evita percorsi con [n] o simili)
+                if not any(item[1] == path for item in structure):
+                    structure.append((tag, path, description or ""))
         
         return structure
 
@@ -736,9 +728,9 @@ class ExcelXmlManager:
             etree.ElementTree: Documento XML generato
         """
         ns_uri = "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"
-        nsmap = {None: ns_uri}
         
-        # Crea elemento radice
+        # Crea elemento radice SENZA prefisso nel namespace
+        nsmap = {None: ns_uri}
         root = etree.Element(f"{{{ns_uri}}}FatturaElettronica", nsmap=nsmap)
         root.set("versione", "FPR12")
         
@@ -875,7 +867,14 @@ class ExcelXmlManager:
         # Applica indentazione per migliorare la leggibilità
         self._indent_xml(root)
         
-        return etree.ElementTree(root)
+        # Crea l'albero XML
+        tree = etree.ElementTree(root)
+        
+        # Aggiungi riferimento allo stylesheet XSL
+        pi = etree.ProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="./fatturapa_v1.2_asw.xsl"')
+        tree.getroot().addprevious(pi)
+        
+        return tree
 
     def _indent_xml(self, elem, level=0):
         """
@@ -908,7 +907,88 @@ class ExcelXmlManager:
         Returns:
             bool, str: (Successo, Percorso del file creato)
         """
-        return self.create_xml_from_excel_by_id(None, output_xml_path)
+        try:
+            self.log("Avviata funzione import_excel_to_xml")
+            
+            # Verifica che il file Excel esista
+            if not os.path.exists(self.excel_path):
+                self.log(f"File Excel non trovato: {self.excel_path}")
+                messagebox.showerror("Errore", f"File Excel non trovato: {self.excel_path}")
+                return False, ""
+            
+            # Carica il workbook
+            wb = openpyxl.load_workbook(self.excel_path)
+            
+            # Verifica che i fogli necessari esistano
+            required_sheets = [self.master_sheet_name, self.details_sheet_name, 
+                            self.summary_sheet_name, self.structure_sheet_name]
+            for sheet_name in required_sheets:
+                if sheet_name not in wb.sheetnames:
+                    self.log(f"Foglio '{sheet_name}' non trovato nel file Excel")
+                    messagebox.showerror("Errore", f"Foglio '{sheet_name}' non trovato nel file Excel")
+                    return False, ""
+            
+            # Mostra il selettore per scegliere la fattura
+            invoice_id = self._show_invoice_selector(wb[self.master_sheet_name])
+            if not invoice_id:
+                self.log("Nessuna fattura selezionata")
+                return False, ""
+            
+            # Se non è specificato un percorso di output, chiedi all'utente
+            if not output_xml_path:
+                output_xml_path = filedialog.asksaveasfilename(
+                    title="Salva il nuovo file XML",
+                    defaultextension=".xml",
+                    filetypes=[("File XML", "*.xml")]
+                )
+                if not output_xml_path:
+                    self.log("Operazione di creazione XML annullata dall'utente")
+                    return False, ""
+            
+            # Estrai i dati della fattura
+            invoice_data = self._get_invoice_data_by_id(wb, invoice_id)
+            if not invoice_data:
+                self.log(f"Dati non trovati per la fattura con ID: {invoice_id}")
+                messagebox.showerror("Errore", f"Dati non trovati per la fattura con ID: {invoice_id}")
+                return False, ""
+            
+            # Crea il documento XML
+            xml_doc = self._generate_xml_from_invoice_data(invoice_data)
+            
+            # Salva il file XML
+            xml_string = etree.tostring(xml_doc, pretty_print=True, encoding="UTF-8", 
+                                        xml_declaration=True).decode("utf-8")
+            
+            # Migliora formattazione per nodi ripetuti
+            xml_string = re.sub(r'(</DettaglioLinee>)(\r?\n)+(<(?:\w+:)?DatiRiepilogo>)', 
+                            r'\1\n      \3', xml_string)
+            xml_string = re.sub(r'(</DettaglioLinee>)(<(?:\w+:)?DatiRiepilogo>)', 
+                            r'\1\n      \2', xml_string)
+            
+            # Aggiungi il prefisso "p:" SOLO all'elemento radice FatturaElettronica
+            xml_string = xml_string.replace("<FatturaElettronica ", "<p:FatturaElettronica ")
+            xml_string = xml_string.replace("</FatturaElettronica>", "</p:FatturaElettronica>")
+            
+            # Aggiungi il namespace "xmlns:p" all'elemento radice
+            xml_string = xml_string.replace("<p:FatturaElettronica ", 
+                                        "<p:FatturaElettronica xmlns:p=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\" ")
+            
+            # Rimuovi il namespace senza prefisso, per evitare di avere entrambi
+            xml_string = xml_string.replace(" xmlns=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\"", "")
+            
+            with open(output_xml_path, 'w', encoding='utf-8') as f:
+                f.write(xml_string)
+            
+            self.log(f"File XML creato con successo: {output_xml_path}")
+            return True, output_xml_path
+            
+        except Exception as e:
+            self.log(f"Errore nella creazione del file XML: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nella creazione del file XML:\n{str(e)}")
+            return False, ""
+
+
 
     def list_invoices(self):
         """
@@ -1055,3 +1135,106 @@ class ExcelXmlManager:
             self.log(f"Errore nell'eliminazione della fattura: {str(e)}")
             traceback.print_exc()
             return False
+        
+
+
+    def create_xml_from_excel_by_id(self, invoice_id=None, output_xml_path=None):
+        """
+        Crea un nuovo XML a partire dai dati in Excel per un ID fattura specifico
+        
+        Args:
+            invoice_id: ID della fattura da creare (se None, viene mostrato un selettore)
+            output_xml_path: Percorso di output del nuovo XML (opzionale)
+        
+        Returns:
+            bool, str: (Successo, Percorso del file creato)
+        """
+        try:
+            # Verifica che il file Excel esista
+            if not self.excel_path:
+                self.log(f"File Excel non specificato")
+                return False, ""
+                
+            if not os.path.exists(self.excel_path):
+                self.log(f"File Excel non trovato: {self.excel_path}")
+                return False, ""
+            
+            # Carica il workbook
+            wb = openpyxl.load_workbook(self.excel_path)
+            
+            # Verifica che i fogli necessari esistano
+            required_sheets = [self.master_sheet_name, self.details_sheet_name, 
+                            self.summary_sheet_name, self.structure_sheet_name]
+            for sheet_name in required_sheets:
+                if sheet_name not in wb.sheetnames:
+                    self.log(f"Foglio '{sheet_name}' non trovato nel file Excel")
+                    return False, ""
+            
+            # Se non è specificato un ID e non è un percorso temporaneo, 
+            # mostra il selettore di fatture
+            if invoice_id is None and (output_xml_path is None or 
+                                    "temp_invoice_" not in output_xml_path):
+                invoice_id = self._show_invoice_selector(wb[self.master_sheet_name])
+                if not invoice_id:
+                    self.log("Nessuna fattura selezionata")
+                    return False, ""
+            
+            # Se non è specificato un percorso di output, chiedi all'utente
+            if not output_xml_path:
+                output_xml_path = filedialog.asksaveasfilename(
+                    title="Salva il nuovo file XML",
+                    defaultextension=".xml",
+                    filetypes=[("File XML", "*.xml")]
+                )
+                if not output_xml_path:
+                    self.log("Operazione di creazione XML annullata dall'utente")
+                    return False, ""
+            
+            # Estrai i dati della fattura
+            invoice_data = self._get_invoice_data_by_id(wb, invoice_id)
+            if not invoice_data:
+                self.log(f"Dati non trovati per la fattura con ID: {invoice_id}")
+                return False, ""
+            
+            # Crea il documento XML
+            xml_doc = self._generate_xml_from_invoice_data(invoice_data)
+            
+            # Salva il file XML
+            xml_string = etree.tostring(xml_doc, pretty_print=True, encoding="UTF-8", 
+                                        xml_declaration=True).decode("utf-8")
+            
+            # Migliora formattazione per nodi ripetuti
+            xml_string = re.sub(r'(</DettaglioLinee>)(\r?\n)+(<(?:\w+:)?DatiRiepilogo>)', 
+                            r'\1\n      \3', xml_string)
+            xml_string = re.sub(r'(</DettaglioLinee>)(<(?:\w+:)?DatiRiepilogo>)', 
+                            r'\1\n      \2', xml_string)
+            
+            # Aggiungi il prefisso "p:" SOLO all'elemento radice FatturaElettronica
+            xml_string = xml_string.replace("<FatturaElettronica ", "<p:FatturaElettronica ")
+            xml_string = xml_string.replace("</FatturaElettronica>", "</p:FatturaElettronica>")
+            
+            # Aggiungi il namespace "xmlns:p" all'elemento radice
+            xml_string = xml_string.replace("<p:FatturaElettronica ", 
+                                        "<p:FatturaElettronica xmlns:p=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\" ")
+            
+            # Rimuovi il namespace senza prefisso, per evitare di avere entrambi
+            xml_string = xml_string.replace(" xmlns=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\"", "")
+            
+            # Aggiungi il riferimento allo stylesheet XSL
+            stylesheet_ref = '<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>\n'
+            if '<?xml ' in xml_string:
+                xml_decl_end = xml_string.find('?>') + 2
+                xml_string = xml_string[:xml_decl_end] + '\n' + stylesheet_ref + xml_string[xml_decl_end:]
+            else:
+                xml_string = stylesheet_ref + xml_string
+            
+            with open(output_xml_path, 'w', encoding='utf-8') as f:
+                f.write(xml_string)
+            
+            self.log(f"File XML creato con successo: {output_xml_path}")
+            return True, output_xml_path
+            
+        except Exception as e:
+            self.log(f"Errore nella creazione del file XML: {str(e)}")
+            traceback.print_exc()
+            return False, ""

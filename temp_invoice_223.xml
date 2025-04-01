@@ -1,0 +1,108 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>
+
+<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>
+<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>
+<p:FatturaElettronica xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" versione="FPR12">
+  <FatturaElettronicaHeader>
+    <DatiTrasmissione>
+      <IdTrasmittente>
+        <IdPaese>IT</IdPaese>
+        <IdCodice>45463740485</IdCodice>
+        </IdTrasmittente>
+      <ProgressivoInvio>223</ProgressivoInvio>
+      <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+      <CodiceDestinatario>0000000</CodiceDestinatario>
+      </DatiTrasmissione>
+    <CedentePrestatore>
+      <DatiAnagrafici>
+        <IdFiscaleIVA>
+          <IdPaese>IT</IdPaese>
+          <IdCodice>45463740485</IdCodice>
+          </IdFiscaleIVA>
+        <Anagrafica>
+          <Denominazione>Emporio dello Sport srl</Denominazione>
+          </Anagrafica>
+        <RegimeFiscale>RF01</RegimeFiscale>
+        </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>Indirizzo</Indirizzo>
+        <CAP>00000</CAP>
+        <Comune>Comune</Comune>
+        <Provincia>RM</Provincia>
+        <Nazione>IT</Nazione>
+        </Sede>
+      </CedentePrestatore>
+    <CessionarioCommittente>
+      <DatiAnagrafici>
+        <IdFiscaleIVA>
+          <IdPaese>IT</IdPaese>
+          <IdCodice>08541347921</IdCodice>
+          </IdFiscaleIVA>
+        <Anagrafica>
+          <Denominazione>Impresa Comm. Individuale Mario Rossi</Denominazione>
+          </Anagrafica>
+        </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>Indirizzo</Indirizzo>
+        <CAP>00000</CAP>
+        <Comune>Comune</Comune>
+        <Provincia>RM</Provincia>
+        <Nazione>IT</Nazione>
+        </Sede>
+      </CessionarioCommittente>
+    </FatturaElettronicaHeader>
+  <FatturaElettronicaBody>
+    <DatiGenerali>
+      <DatiGeneraliDocumento>
+        <TipoDocumento>TD01</TipoDocumento>
+        <Divisa>EUR</Divisa>
+        <Data>2022-06-06</Data>
+        <Numero>225</Numero>
+        <ImportoTotaleDocumento>7076.00</ImportoTotaleDocumento>
+        </DatiGeneraliDocumento>
+      </DatiGenerali>
+    <DatiBeniServizi>
+      <DettaglioLinee>
+        <NumeroLinea>1</NumeroLinea>
+        <Descrizione>Borsoni fitness (cod. art. BO33)</Descrizione>
+        <Quantita>220.0000000</Quantita>
+        <UnitaMisura>NR</UnitaMisura>
+        <PrezzoUnitario>15.0000000</PrezzoUnitario>
+        <PrezzoTotale>3300.0000000</PrezzoTotale>
+        <AliquotaIVA>22.00</AliquotaIVA>
+        </DettaglioLinee>
+      <DettaglioLinee>
+        <NumeroLinea>2</NumeroLinea>
+        <Descrizione>Scarpe ginnastica (cod. art. SC55)</Descrizione>
+        <Quantita>250.0000000</Quantita>
+        <UnitaMisura>NR</UnitaMisura>
+        <PrezzoUnitario>10.0000000</PrezzoUnitario>
+        <PrezzoTotale>2500.0000000</PrezzoTotale>
+        <AliquotaIVA>22.00</AliquotaIVA>
+        </DettaglioLinee>
+      <DettaglioLinee>
+        <NumeroLinea>3</NumeroLinea>
+        <Descrizione>CONTRIBUTO CONAI ASSOLTO</Descrizione>
+        <PrezzoUnitario>0.0000000</PrezzoUnitario>
+        <PrezzoTotale>0.0000000</PrezzoTotale>
+        <AliquotaIVA>22.00</AliquotaIVA>
+        </DettaglioLinee>
+      <DatiRiepilogo>
+        <AliquotaIVA>22.00</AliquotaIVA>
+        <ImponibileImporto>5800.00</ImponibileImporto>
+        <Imposta>1276.00</Imposta>
+        <EsigibilitaIVA>I</EsigibilitaIVA>
+        </DatiRiepilogo>
+      </DatiBeniServizi>
+    <DatiPagamento>
+      <CondizioniPagamento>TP02</CondizioniPagamento>
+      <DettaglioPagamento>
+        <ModalitaPagamento>MP05</ModalitaPagamento>
+        <DataScadenzaPagamento>2022-07-06</DataScadenzaPagamento>
+        <ImportoPagamento>7076.00</ImportoPagamento>
+        </DettaglioPagamento>
+      </DatiPagamento>
+    </FatturaElettronicaBody>
+  </p:FatturaElettronica>
+

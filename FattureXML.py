@@ -31,6 +31,11 @@ class FatturaViewer(tk.Tk):
         self.line_modifications = {}
         
 
+        # Riferimenti ai pulsanti per gestire lo stato abilitato/disabilitato
+        self.edit_btn = None
+        self.view_btn = None
+        self.excel_save_btn = None
+        
         # Inizializza le variabili per le linee
         self.normal_lines = []
         self.conai_line = None
@@ -41,6 +46,8 @@ class FatturaViewer(tk.Tk):
         self.NS = {"p": "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"}
         # Inizializza il manager Excel-XML
         self.excel_manager = ExcelXmlManager(self, self.NS)
+        self.excel_manage_btn = None  # Pulsante Gestisci Fatture
+        self.excel_db_label = None    # Etichetta per mostrare il db corrente        
         
         self.create_widgets()
         self.find_xsl_files()
@@ -154,7 +161,7 @@ class FatturaViewer(tk.Tk):
         self.content_frame = tk.Frame(main_frame)
         self.content_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Sezione File XML
+        # Sezione File XML - Include il pulsante "Modifica Fattura"
         xml_section = tk.LabelFrame(left_frame, text="File XML", padx=5, pady=5)
         xml_section.pack(fill=tk.X, padx=0, pady=(0, 10))
         
@@ -165,21 +172,10 @@ class FatturaViewer(tk.Tk):
                             bg="#8BC34A", fg="white", width=20)
         template_btn.pack(anchor=tk.W, pady=(0, 5))
         
-        # Sezione Excel
-        excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
-        excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
-        
-        excel_export_btn = tk.Button(excel_section, text="Esporta in Excel", command=self.export_to_excel,
-                                bg="#2196F3", fg="white", width=20)
-        excel_export_btn.pack(anchor=tk.W, pady=(0, 5))
-        
-        excel_import_btn = tk.Button(excel_section, text="XML da Excel", command=self.create_xml_from_excel,
-                                bg="#9C27B0", fg="white", width=20)
-        excel_import_btn.pack(anchor=tk.W, pady=(0, 5))
-        
-        excel_manage_btn = tk.Button(excel_section, text="Gestisci Fatture", command=self.manage_invoices,
-                                bg="#FF9800", fg="white", width=20)
-        excel_manage_btn.pack(anchor=tk.W, pady=(0, 5))
+        # Salva il riferimento al pulsante edit_btn e lo inizializza come disabilitato
+        self.edit_btn = tk.Button(xml_section, text="Modifica Fattura", command=self.edit_invoice, 
+                            bg="#2196F3", fg="white", width=20, state=tk.DISABLED)
+        self.edit_btn.pack(anchor=tk.W, pady=(0, 5))
         
         # Sezione Foglio di stile
         xsl_section = tk.LabelFrame(left_frame, text="Foglio di stile", padx=5, pady=5)
@@ -191,14 +187,48 @@ class FatturaViewer(tk.Tk):
         self.xsl_dropdown.pack(anchor=tk.W, pady=(0, 5))
         self.xsl_dropdown.bind("<<ComboboxSelected>>", self.on_xsl_selected)
         
-        view_btn = tk.Button(xsl_section, text="Visualizza Fattura", command=self.transform_and_view, 
-                            bg="#4CAF50", fg="white", width=20)
-        view_btn.pack(anchor=tk.W, pady=(5, 5))
+        # Salva il riferimento al pulsante view_btn e lo inizializza come disabilitato
+        self.view_btn = tk.Button(xsl_section, text="Visualizza Fattura", command=self.transform_and_view, 
+                            bg="#4CAF50", fg="white", width=20, state=tk.DISABLED)
+        self.view_btn.pack(anchor=tk.W, pady=(5, 5))
         
-        edit_btn = tk.Button(xsl_section, text="Modifica Fattura", command=self.edit_invoice, 
-                            bg="#2196F3", fg="white", width=20)
-        edit_btn.pack(anchor=tk.W, pady=(5, 5))
+        # Sezione Excel - Aggiornata con quattro pulsanti
+        excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
+        excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
+            
+        # Sezione Excel - Aggiungere l'etichetta per il database
+        excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
+        excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
         
+        # Pulsante per caricare un database Excel esistente
+        excel_load_btn = tk.Button(excel_section, text="Carica DB Excel", command=self.load_excel_db,
+                                bg="#673AB7", fg="white", width=20)
+        excel_load_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Pulsante per creare un nuovo database Excel
+        excel_create_btn = tk.Button(excel_section, text="Crea DB Excel", command=self.create_excel_db,
+                                bg="#009688", fg="white", width=20)
+        excel_create_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Etichetta per mostrare il database Excel attuale
+        db_label_frame = tk.Frame(excel_section)
+        db_label_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        tk.Label(db_label_frame, text="Database:").pack(side=tk.LEFT, padx=(0, 5))
+        self.excel_db_label = tk.Label(db_label_frame, text="Non specificato", fg="gray", anchor="w")
+        self.excel_db_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Salva il riferimento al pulsante excel_save_btn e lo inizializza come disabilitato
+        self.excel_save_btn = tk.Button(excel_section, text="Salva in Excel", command=self.export_to_excel,
+                                bg="#2196F3", fg="white", width=20, state=tk.DISABLED)
+        self.excel_save_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Salva il riferimento al pulsante excel_manage_btn e lo inizializza come disabilitato
+        self.excel_manage_btn = tk.Button(excel_section, text="Gestisci Fatture", command=self.manage_invoices,
+                                bg="#FF9800", fg="white", width=20, state=tk.DISABLED)
+        self.excel_manage_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Informazioni sui file
         info_frame = tk.LabelFrame(self.content_frame, text="Informazioni sui file")
         info_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -241,7 +271,7 @@ class FatturaViewer(tk.Tk):
         self.editor_buttons_frame.pack(fill=tk.X, pady=5)
         
         self.save_btn = tk.Button(self.editor_buttons_frame, text="Salva XML", command=self.save_xml,
-                                  bg="#FFC107", fg="black", padx=10, pady=5)
+                                bg="#FFC107", fg="black", padx=10, pady=5)
         self.save_btn.pack(side=tk.RIGHT, padx=5)
         
         self.cancel_btn = tk.Button(self.editor_buttons_frame, text="Annulla", command=self.cancel_edit,
@@ -249,7 +279,9 @@ class FatturaViewer(tk.Tk):
         self.cancel_btn.pack(side=tk.RIGHT, padx=5)
         
         self.log("Applicazione avviata. Seleziona i file per iniziare.")
-    
+
+        
+            
     def find_xsl_files(self):
         try:
             xsl_pattern = os.path.join(self.project_dir, "*.xsl")
@@ -269,6 +301,7 @@ class FatturaViewer(tk.Tk):
         except Exception as e:
             self.log(f"Errore durante la ricerca dei file XSL: {str(e)}")
     
+    # Modifica le funzioni che caricano file per aggiornare lo stato dei pulsanti
     def select_xml(self):
         filepath = filedialog.askopenfilename(
             title="Seleziona il file XML della fattura",
@@ -281,9 +314,13 @@ class FatturaViewer(tk.Tk):
             try:
                 self.xml_doc = etree.parse(filepath)
                 self.log("File XML caricato con successo")
+                # Aggiorna lo stato dei pulsanti
+                self.update_button_states()
             except Exception as e:
                 self.log(f"Errore nel caricamento del file XML: {str(e)}")
                 self.xml_doc = None
+                # Aggiorna lo stato dei pulsanti (disabilita)
+                self.update_button_states()
     
     def on_xsl_selected(self, event):
         selected_index = self.xsl_dropdown.current()
@@ -291,6 +328,8 @@ class FatturaViewer(tk.Tk):
             self.xsl_path = self.xsl_files[selected_index]
             self.update_xsl_labels(self.xsl_path)
             self.log(f"Foglio di stile selezionato: {self.xsl_path}")
+            # Aggiorna lo stato dei pulsanti
+            self.update_button_states()
     
     def update_xsl_labels(self, filepath):
         self.xsl_label.config(text=os.path.basename(filepath))
@@ -811,7 +850,7 @@ class FatturaViewer(tk.Tk):
         xml_string = etree.tostring(self.xml_doc, pretty_print=True, encoding='utf-8').decode('utf-8')
         text_widget.insert(tk.END, xml_string)
         text_widget.config(state=tk.DISABLED)
-    
+        
     def save_xml(self):
         if not self.xml_doc:
             return
@@ -853,16 +892,60 @@ class FatturaViewer(tk.Tk):
                 new_xml = etree.tostring(self.xml_doc, pretty_print=True, encoding="UTF-8", xml_declaration=True).decode("utf-8")
                 new_xml = re.sub(r'(</DettaglioLinee>)(\r?\n)+(<(?:\w+:)?DatiRiepilogo>)', r'\1\n      \3', new_xml)
                 new_xml = re.sub(r'(</DettaglioLinee>)(<(?:\w+:)?DatiRiepilogo>)', r'\1\n      \2', new_xml)
+                
+                # Aggiungi il prefisso "p:" SOLO all'elemento radice FatturaElettronica
+                new_xml = new_xml.replace("<FatturaElettronica ", "<p:FatturaElettronica ")
+                new_xml = new_xml.replace("</FatturaElettronica>", "</p:FatturaElettronica>")
+                
+                # Aggiungi il namespace "xmlns:p" all'elemento radice
+                new_xml = new_xml.replace("<p:FatturaElettronica ", 
+                                        "<p:FatturaElettronica xmlns:p=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\" ")
+                
+                # Rimuovi il namespace senza prefisso, per evitare di avere entrambi
+                new_xml = new_xml.replace(" xmlns=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\"", "")
+                
+                # Aggiungi il riferimento allo stylesheet XSL
+                stylesheet_ref = '<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>\n'
+                if '<?xml ' in new_xml:
+                    xml_decl_end = new_xml.find('?>') + 2
+                    new_xml = new_xml[:xml_decl_end] + '\n' + stylesheet_ref + new_xml[xml_decl_end:]
+                else:
+                    new_xml = stylesheet_ref + new_xml
+                
                 with open(output_path, 'w', encoding='utf-8') as f:
                     f.write(new_xml)
                 
+                # Aggiorna il percorso del file XML
+                self.xml_path = output_path
+                self.xml_label.config(text=os.path.basename(output_path))
+                
                 self.log(f"File salvato con successo: {output_path}")
                 messagebox.showinfo("Salvataggio completato", f"Il file XML è stato salvato con successo.")
+                
+                # Verifica se il file salvato era un file temporaneo
+                # e chiedi all'utente se vuole aggiornare il database Excel
+                is_temp_file = "temp_invoice_" in os.path.basename(self.xml_path).lower()
+                
+                if is_temp_file and self.excel_manager.excel_path:
+                    update_excel = messagebox.askyesno("Aggiornamento Excel", 
+                                                    "Vuoi aggiornare anche il database Excel con le modifiche apportate?")
+                    if update_excel:
+                        success = self.excel_manager.export_xml_to_excel(self.xml_doc)
+                        if success:
+                            messagebox.showinfo("Aggiornamento Excel", 
+                                            "Il database Excel è stato aggiornato con successo.")
+                        else:
+                            messagebox.showerror("Errore", 
+                                            "Si è verificato un errore durante l'aggiornamento del database Excel.")
+                
                 self.cancel_edit()
+                
+                # Aggiorna lo stato dei pulsanti
+                self.update_button_states()
             except Exception as e:
                 self.log(f"Errore nel salvataggio del file: {str(e)}")
                 messagebox.showerror("Errore", f"Errore nel salvataggio del file:\n{str(e)}")
-    
+  
     def cancel_edit(self):
         # Rimuovi il binding della rotellina del mouse
         self.unbind_all("<MouseWheel>")
@@ -1645,18 +1728,43 @@ class FatturaViewer(tk.Tk):
                 self.xml_doc = etree.parse(template_path)
                 self.log("File modello XML caricato con successo")
                 messagebox.showinfo("Modello Caricato", "Il modello di fattura è stato caricato con successo.")
+                # Aggiorna lo stato dei pulsanti
+                self.update_button_states()
             except Exception as e:
                 self.log(f"Errore nel caricamento del file modello XML: {str(e)}")
                 self.xml_doc = None
+                # Aggiorna lo stato dei pulsanti (disabilita)
+                self.update_button_states()
                 messagebox.showerror("Errore", f"Errore nel caricamento del file modello XML:\n{str(e)}")
         except Exception as e:
             self.log(f"Errore nel caricamento del modello: {str(e)}")
-            messagebox.showerror("Errore", f"Errore nel caricamento del modello:\n{str(e)}")     
+            messagebox.showerror("Errore", f"Errore nel caricamento del modello:\n{str(e)}")    
             
     def export_to_excel(self):
         """Esporta i dati del file XML attuale in Excel"""
         if not self.xml_path or not self.xml_doc:
             messagebox.showerror("Errore", "Seleziona prima un file XML valido")
+            return
+        
+        # Verifica se è stato impostato un file Excel
+        if not self.excel_manager.excel_path:
+            # Chiedi all'utente se vuole creare un nuovo file o caricarne uno esistente
+            choice = messagebox.askquestion("Database Excel",
+                                        "Non è stato specificato un database Excel.\n\n" +
+                                        "Vuoi crearne uno nuovo?\n\n" +
+                                        "Seleziona 'Sì' per creare un nuovo database Excel, " +
+                                        "'No' per selezionare un database esistente.")
+            
+            if choice == 'yes':
+                # Crea un nuovo database Excel
+                self.create_excel_db()
+            else:
+                # Carica un database esistente
+                self.load_excel_db()
+        
+        # Controlla nuovamente se dopo le azioni dell'utente c'è un percorso Excel valido
+        if not self.excel_manager.excel_path:
+            self.log("Operazione annullata: nessun database Excel specificato")
             return
         
         try:
@@ -1666,11 +1774,12 @@ class FatturaViewer(tk.Tk):
                                 f"I dati sono stati esportati con successo nel file Excel")
             else:
                 messagebox.showerror("Errore", 
-                                    "Si è verificato un errore durante l'esportazione in Excel")
+                                "Si è verificato un errore durante l'esportazione in Excel")
         except Exception as e:
             self.log(f"Errore nell'esportazione in Excel: {str(e)}")
             traceback.print_exc()
             messagebox.showerror("Errore", f"Errore nell'esportazione in Excel:\n{str(e)}")
+
 
     def create_xml_from_excel(self):
         """Crea un nuovo file XML dai dati in Excel"""
@@ -1690,22 +1799,48 @@ class FatturaViewer(tk.Tk):
                     try:
                         self.xml_doc = etree.parse(new_xml_path)
                         self.log("Nuovo file XML caricato con successo")
+                        # Aggiorna lo stato dei pulsanti
+                        self.update_button_states()
                     except Exception as e:
                         self.log(f"Errore nel caricamento del nuovo file XML: {str(e)}")
                         self.xml_doc = None
+                        # Aggiorna lo stato dei pulsanti (disabilita)
+                        self.update_button_states()
         except Exception as e:
             self.log(f"Errore nella creazione del file XML da Excel: {str(e)}")
             traceback.print_exc()
             messagebox.showerror("Errore", f"Errore nella creazione del file XML da Excel:\n{str(e)}")
 
+
     def manage_invoices(self):
         """Mostra una finestra per gestire le fatture in Excel"""
         try:
+            # Verifica se è stato impostato un file Excel
+            if not self.excel_manager.excel_path:
+                # Chiedi all'utente se vuole creare un nuovo file o caricarne uno esistente
+                choice = messagebox.askquestion("Database Excel",
+                                            "Non è stato specificato un database Excel.\n\n" +
+                                            "Vuoi crearne uno nuovo?\n\n" +
+                                            "Seleziona 'Sì' per creare un nuovo database Excel, " +
+                                            "'No' per selezionare un database esistente.")
+                
+                if choice == 'yes':
+                    # Crea un nuovo database Excel
+                    self.create_excel_db()
+                else:
+                    # Carica un database esistente
+                    self.load_excel_db()
+            
+            # Controlla nuovamente se dopo le azioni dell'utente c'è un percorso Excel valido
+            if not self.excel_manager.excel_path:
+                self.log("Operazione annullata: nessun database Excel specificato")
+                return
+            
             # Verifica che il file Excel esista
             excel_path = self.excel_manager.excel_path
             if not os.path.exists(excel_path):
                 messagebox.showinfo("Informazione", 
-                                f"Il file Excel non esiste ancora.\nEsporta prima una fattura in Excel.")
+                                f"Il file Excel non esiste.\nCrea prima una fattura in Excel.")
                 return
             
             # Ottieni l'elenco delle fatture
@@ -1802,10 +1937,112 @@ class FatturaViewer(tk.Tk):
                         try:
                             self.xml_doc = etree.parse(new_xml_path)
                             self.log("Nuovo file XML caricato con successo")
+                            # Aggiorna lo stato dei pulsanti
+                            self.update_button_states()
                             manager.destroy()  # Chiudi la finestra
                         except Exception as e:
                             self.log(f"Errore nel caricamento del nuovo file XML: {str(e)}")
                             self.xml_doc = None
+                            # Aggiorna lo stato dei pulsanti
+                            self.update_button_states()
+
+            def edit_invoice_from_excel():
+                """Modifica la fattura selezionata nel treeview"""
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Attenzione", "Seleziona prima una fattura")
+                    return
+                
+                item = tree.item(selection[0])
+                invoice_id = item["values"][0]
+                invoice_number = item["values"][1]
+                
+                # Genera un file XML temporaneo per la modifica
+                import tempfile
+                temp_dir = tempfile.gettempdir()
+                temp_file = os.path.join(temp_dir, f"temp_invoice_{invoice_number}.xml")
+                
+                # Controlla se il metodo create_xml_from_excel_by_id esiste
+                if hasattr(self.excel_manager, 'create_xml_from_excel_by_id'):
+                    # Usa il metodo se esiste
+                    success, xml_path = self.excel_manager.create_xml_from_excel_by_id(invoice_id, temp_file)
+                else:
+                    # Altrimenti usa il metodo import_excel_to_xml con id e path specificati manualmente
+                    self.log("Utilizzo metodo alternativo per generare XML")
+                    try:
+                        # Carica il workbook Excel
+                        import openpyxl
+                        excel_path = self.excel_manager.excel_path
+                        wb = openpyxl.load_workbook(excel_path)
+                        
+                        # Estrai i dati della fattura
+                        invoice_data = self.excel_manager._get_invoice_data_by_id(wb, invoice_id)
+                        if not invoice_data:
+                            messagebox.showerror("Errore", f"Dati non trovati per la fattura con ID: {invoice_id}")
+                            return
+                        
+                        # Genera XML dalla fattura
+                        xml_doc = self.excel_manager._generate_xml_from_invoice_data(invoice_data)
+                        
+                        # Salva il file XML
+                        xml_string = etree.tostring(xml_doc, pretty_print=True, encoding="UTF-8", 
+                                                    xml_declaration=True).decode("utf-8")
+                        
+                        # Aggiungi gli stessi miglioramenti del metodo create_xml_from_excel_by_id
+                        xml_string = xml_string.replace("<FatturaElettronica ", "<p:FatturaElettronica ")
+                        xml_string = xml_string.replace("</FatturaElettronica>", "</p:FatturaElettronica>")
+                        xml_string = xml_string.replace("<p:FatturaElettronica ", 
+                                                    "<p:FatturaElettronica xmlns:p=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\" ")
+                        xml_string = xml_string.replace(" xmlns=\"http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2\"", "")
+                        
+                        # Aggiungi riferimento stylesheet
+                        stylesheet_ref = '<?xml-stylesheet type="text/xsl" href="./fatturapa_v1.2_asw.xsl"?>\n'
+                        if '<?xml ' in xml_string:
+                            xml_decl_end = xml_string.find('?>') + 2
+                            xml_string = xml_string[:xml_decl_end] + '\n' + stylesheet_ref + xml_string[xml_decl_end:]
+                        else:
+                            xml_string = stylesheet_ref + xml_string
+                        
+                        with open(temp_file, 'w', encoding='utf-8') as f:
+                            f.write(xml_string)
+                        
+                        success = True
+                        xml_path = temp_file
+                        
+                    except Exception as e:
+                        self.log(f"Errore nella generazione del XML: {str(e)}")
+                        traceback.print_exc()
+                        messagebox.showerror("Errore", f"Errore nella generazione del XML:\n{str(e)}")
+                        success = False
+                        xml_path = None
+                
+                if not success:
+                    messagebox.showerror("Errore", "Impossibile creare il file XML temporaneo per la modifica")
+                    return
+                
+                # Carica il file XML appena creato
+                self.xml_path = xml_path
+                self.xml_label.config(text=f"Temp: {os.path.basename(xml_path)}")
+                self.log(f"File XML temporaneo creato per modifica: {xml_path}")
+                
+                try:
+                    self.xml_doc = etree.parse(xml_path)
+                    self.log("File XML temporaneo caricato con successo")
+                    
+                    # Chiudi la finestra di gestione
+                    manager.destroy()
+                    
+                    # Aggiorna lo stato dei pulsanti
+                    self.update_button_states()
+                    
+                    # Avvia la modalità di modifica
+                    self.edit_invoice()
+                    
+                except Exception as e:
+                    self.log(f"Errore nel caricamento del file XML temporaneo: {str(e)}")
+                    self.xml_doc = None
+                    self.update_button_states()
+                    messagebox.showerror("Errore", f"Errore nel caricamento del file XML:\n{str(e)}")
             
             def delete_invoice():
                 selection = tree.selection()
@@ -1857,13 +2094,18 @@ class FatturaViewer(tk.Tk):
             create_btn = tk.Button(button_frame, text="Crea XML", command=create_xml,
                                 bg="#4CAF50", fg="white", width=15, padx=5, pady=5)
             create_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+            # Pulsante Modifica
+            edit_btn = tk.Button(button_frame, text="Modifica", command=edit_invoice_from_excel,
+                            bg="#2196F3", fg="white", width=15, padx=5, pady=5)
+            edit_btn.pack(side=tk.LEFT, padx=5)
             
             delete_btn = tk.Button(button_frame, text="Elimina", command=delete_invoice,
                                 bg="#F44336", fg="white", width=15, padx=5, pady=5)
             delete_btn.pack(side=tk.LEFT, padx=5)
             
             excel_btn = tk.Button(button_frame, text="Apri Excel", command=open_excel,
-                                bg="#2196F3", fg="white", width=15, padx=5, pady=5)
+                                bg="#673AB7", fg="white", width=15, padx=5, pady=5)
             excel_btn.pack(side=tk.LEFT, padx=5)
             
             refresh_btn = tk.Button(button_frame, text="Aggiorna", command=refresh_list,
@@ -1875,13 +2117,248 @@ class FatturaViewer(tk.Tk):
             close_btn.pack(side=tk.RIGHT, padx=5)
             
             # Gestione doppio click su riga
-            tree.bind("<Double-1>", lambda e: create_xml())
+            tree.bind("<Double-1>", lambda e: edit_invoice_from_excel())  # Doppio click modifica la fattura
             
         except Exception as e:
             self.log(f"Errore nella gestione delle fatture in Excel: {str(e)}")
             traceback.print_exc()
             messagebox.showerror("Errore", f"Errore nella gestione delle fatture in Excel:\n{str(e)}")
-                        
+
+            
+    # Aggiorna il metodo di aggiornamento dello stato dei pulsanti
+    def update_button_states(self):
+        """Aggiorna lo stato dei pulsanti in base alle condizioni attuali"""
+        
+        # Controlla se un file XML è caricato
+        xml_loaded = self.xml_path is not None and self.xml_doc is not None
+        
+        # Controlla se un foglio di stile XSL è selezionato
+        xsl_selected = self.xsl_path is not None
+        
+        # Imposta lo stato dei pulsanti in base alle condizioni
+        if xml_loaded:
+            self.edit_btn.config(state=tk.NORMAL)
+            self.excel_save_btn.config(state=tk.NORMAL)
+        else:
+            self.edit_btn.config(state=tk.DISABLED)
+            self.excel_save_btn.config(state=tk.DISABLED)
+        
+        # Il pulsante Visualizza richiede sia XML che XSL
+        if xml_loaded and xsl_selected:
+            self.view_btn.config(state=tk.NORMAL)
+        else:
+            self.view_btn.config(state=tk.DISABLED)
+        
+        # Aggiorna anche le informazioni del database Excel
+        self.update_excel_db_info()
+
+
+    # Aggiungi questi nuovi metodi alla classe FatturaViewer
+
+
+    # Modifica i metodi load_excel_db e create_excel_db per aggiornare l'interfaccia
+    def load_excel_db(self):
+        """Carica un database Excel esistente"""
+        try:
+            # Chiedi all'utente di selezionare il file Excel
+            filepath = filedialog.askopenfilename(
+                title="Seleziona il file Excel di database",
+                filetypes=[("File Excel", "*.xlsx")]
+            )
+            
+            if not filepath:
+                return  # L'utente ha annullato la selezione
+            
+            # Verifica che il file esista e sia un file Excel valido
+            if not os.path.exists(filepath):
+                messagebox.showerror("Errore", "Il file selezionato non esiste.")
+                return
+                
+            # Aggiorna il percorso del file Excel nel manager
+            self.excel_manager.excel_path = filepath
+            
+            # Verifica che il file Excel abbia i fogli necessari
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(filepath, read_only=True)
+                
+                # Controlla se i fogli richiesti esistono
+                required_sheets = [
+                    self.excel_manager.master_sheet_name,
+                    self.excel_manager.details_sheet_name,
+                    self.excel_manager.summary_sheet_name,
+                    self.excel_manager.structure_sheet_name
+                ]
+                
+                missing_sheets = [sheet for sheet in required_sheets if sheet not in wb.sheetnames]
+                
+                if missing_sheets:
+                    # Se mancano fogli, chiedi all'utente se vuole crearli
+                    result = messagebox.askyesno("Fogli mancanti", 
+                        f"Il file Excel non contiene tutti i fogli necessari. Mancano: {', '.join(missing_sheets)}.\n\n" +
+                        "Vuoi creare i fogli mancanti?")
+                    
+                    if result:
+                        # Crea i fogli mancanti
+                        wb.close()  # Chiudi il file read-only
+                        self.create_excel_sheets(filepath, missing_sheets)
+                        self.log(f"Fogli mancanti creati nel file: {filepath}")
+                    else:
+                        self.log("Operazione annullata: fogli mancanti non creati")
+                        return
+                else:
+                    wb.close()  # Chiudi il file read-only
+                    
+                self.log(f"Database Excel caricato: {filepath}")
+                messagebox.showinfo("Database Excel", f"Database Excel caricato con successo:\n{os.path.basename(filepath)}")
+                
+                # Aggiorna l'interfaccia utente
+                self.update_button_states()
+                
+            except Exception as e:
+                self.log(f"Errore nel controllo del file Excel: {str(e)}")
+                messagebox.showerror("Errore", f"Errore nel controllo del file Excel:\n{str(e)}")
+                return
+            
+        except Exception as e:
+            self.log(f"Errore nel caricamento del database Excel: {str(e)}")
+            messagebox.showerror("Errore", f"Errore nel caricamento del database Excel:\n{str(e)}")
+
+    def create_excel_db(self):
+        """Crea un nuovo database Excel vuoto"""
+        try:
+            # Chiedi all'utente dove salvare il nuovo file Excel
+            filepath = filedialog.asksaveasfilename(
+                title="Salva il nuovo database Excel",
+                filetypes=[("File Excel", "*.xlsx")],
+                defaultextension=".xlsx"
+            )
+            
+            if not filepath:
+                return  # L'utente ha annullato la selezione
+            
+            # Assicurati che il file abbia estensione .xlsx
+            if not filepath.lower().endswith('.xlsx'):
+                filepath += '.xlsx'
+            
+            # Crea un nuovo file Excel con i fogli necessari
+            self.create_excel_sheets(filepath, [
+                self.excel_manager.master_sheet_name,
+                self.excel_manager.details_sheet_name, 
+                self.excel_manager.summary_sheet_name,
+                self.excel_manager.structure_sheet_name
+            ])
+            
+            # Aggiorna il percorso del file Excel nel manager
+            self.excel_manager.excel_path = filepath
+            
+            self.log(f"Nuovo database Excel creato: {filepath}")
+            messagebox.showinfo("Database Excel", f"Nuovo database Excel creato con successo:\n{os.path.basename(filepath)}")
+            
+            # Aggiorna l'interfaccia utente
+            self.update_button_states()
+            
+        except Exception as e:
+            self.log(f"Errore nella creazione del database Excel: {str(e)}")
+            messagebox.showerror("Errore", f"Errore nella creazione del database Excel:\n{str(e)}")
+
+
+
+    def create_excel_sheets(self, filepath, sheet_names):
+        """
+        Crea i fogli necessari in un file Excel esistente o nuovo
+        
+        Args:
+            filepath: Percorso del file Excel
+            sheet_names: Lista dei nomi dei fogli da creare
+        """
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+        
+        # Verifica se il file esiste già
+        file_exists = os.path.exists(filepath)
+        
+        if file_exists:
+            # Apri il file esistente
+            wb = openpyxl.load_workbook(filepath)
+        else:
+            # Crea un nuovo workbook
+            wb = openpyxl.Workbook()
+            # Rimuovi il foglio di default
+            if "Sheet" in wb.sheetnames:
+                wb.remove(wb["Sheet"])
+        
+        # Crea i fogli mancanti con le intestazioni appropriate
+        for sheet_name in sheet_names:
+            # Salta se il foglio esiste già
+            if sheet_name in wb.sheetnames:
+                continue
+                
+            # Crea un nuovo foglio
+            sheet = wb.create_sheet(title=sheet_name)
+            
+            # Stile per le intestazioni
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            
+            # Aggiungi le intestazioni in base al tipo di foglio
+            if sheet_name == self.excel_manager.master_sheet_name:
+                headers = [
+                    "ID_Fattura", "NumeroFattura", "DataFattura", "TipoDocumento", 
+                    "ImportoTotale", "CedenteDenominazione", "CedentePartitaIVA", 
+                    "CessionarioDenominazione", "CessionarioPartitaIVA", "NotaFattura"
+                ]
+            elif sheet_name == self.excel_manager.details_sheet_name:
+                headers = [
+                    "ID_Fattura", "NumeroLinea", "Descrizione", "Quantita", 
+                    "UnitaMisura", "PrezzoUnitario", "PrezzoTotale", "AliquotaIVA", "Note"
+                ]
+            elif sheet_name == self.excel_manager.summary_sheet_name:
+                headers = [
+                    "ID_Fattura", "AliquotaIVA", "ImponibileImporto", "Imposta", 
+                    "EsigibilitaIVA", "Natura"
+                ]
+            elif sheet_name == self.excel_manager.structure_sheet_name:
+                headers = [
+                    "TagXML", "Percorso", "Descrizione"
+                ]
+            else:
+                # Foglio generico senza intestazioni specifiche
+                headers = []
+            
+            # Aggiungi le intestazioni al foglio
+            for col_idx, header in enumerate(headers, 1):
+                cell = sheet.cell(row=1, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center")
+            
+            # Imposta larghezza colonne
+            for i, _ in enumerate(headers, 1):
+                sheet.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 20
+        
+        # Salva il workbook
+        wb.save(filepath)
+
+
+
+    # Aggiungi un metodo per aggiornare le informazioni del database Excel
+    def update_excel_db_info(self):
+        """Aggiorna l'etichetta del database Excel e lo stato dei pulsanti correlati"""
+        if self.excel_manager.excel_path and os.path.exists(self.excel_manager.excel_path):
+            # Mostra il nome del file (non il percorso completo per evitare etichette troppo lunghe)
+            db_name = os.path.basename(self.excel_manager.excel_path)
+            self.excel_db_label.config(text=db_name, fg="black")
+            
+            # Abilita il pulsante Gestisci Fatture
+            self.excel_manage_btn.config(state=tk.NORMAL)
+        else:
+            # Nessun database specificato o il file non esiste
+            self.excel_db_label.config(text="Non specificato", fg="gray")
+            
+            # Disabilita il pulsante Gestisci Fatture
+            self.excel_manage_btn.config(state=tk.DISABLED)
+                    
 if __name__ == "__main__":
     app = FatturaViewer()
     app.mainloop()
