@@ -270,10 +270,18 @@ class FatturaViewer(tk.Tk):
         self.editor_buttons_frame = tk.Frame(self.editor_frame)
         self.editor_buttons_frame.pack(fill=tk.X, pady=5)
         
+        # Pulsante Salva XML
         self.save_btn = tk.Button(self.editor_buttons_frame, text="Salva XML", command=self.save_xml,
                                 bg="#FFC107", fg="black", padx=10, pady=5)
         self.save_btn.pack(side=tk.RIGHT, padx=5)
         
+        # Nuovo pulsante Salva nel DB Excel
+        self.save_to_excel_btn = tk.Button(self.editor_buttons_frame, text="Salva nel DB Excel", 
+                                        command=self.save_to_excel_db,
+                                        bg="#4CAF50", fg="white", padx=10, pady=5)
+        self.save_to_excel_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # Pulsante Annulla
         self.cancel_btn = tk.Button(self.editor_buttons_frame, text="Annulla", command=self.cancel_edit,
                                     padx=10, pady=5)
         self.cancel_btn.pack(side=tk.RIGHT, padx=5)
@@ -356,6 +364,8 @@ class FatturaViewer(tk.Tk):
             self.log(f"Errore durante la trasformazione: {str(e)}")
             messagebox.showerror("Errore", f"Si è verificato un errore durante la trasformazione:\n{str(e)}")
             
+
+
     def edit_invoice(self):
         if not self.xml_path or not self.xml_doc:
             messagebox.showerror("Errore", "Seleziona prima un file XML valido")
@@ -648,8 +658,14 @@ class FatturaViewer(tk.Tk):
                     date_frame.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
                 else:
                     # Per i campi normali, usa Entry standard
+
+                    # Per tutti gli altri campi, mantieni il comportamento originale
                     entry_widget = tk.Entry(section_frame, width=30)
                     entry_widget.insert(0, value)
+
+
+
+
                     entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
                     
                     # Tieni traccia dei campi imponibile e imposta nella sezione Dati Riepilogo
@@ -786,7 +802,7 @@ class FatturaViewer(tk.Tk):
         self.edit_widgets.append(recalc_btn)
                 
         self.update_nav_buttons()
-        
+            
         # Frame per i pulsanti centrati in basso
         buttons_frame = tk.Frame(self.editor_scrollable_frame)
         buttons_frame.grid(row=detail_row+3, column=0, sticky="ew", padx=10, pady=15)
@@ -805,6 +821,16 @@ class FatturaViewer(tk.Tk):
         self.cancel_btn = tk.Button(centered_buttons, text="Annulla", command=self.cancel_edit,
                                     padx=20, pady=8, font=("", 10))
         self.cancel_btn.pack(side=tk.LEFT, padx=10)
+        
+        # Pulsante Salva nel DB Excel
+        excel_db_enabled = self.excel_manager.excel_path is not None
+        excel_button_state = tk.NORMAL if excel_db_enabled else tk.DISABLED
+        
+        self.save_to_excel_btn = tk.Button(centered_buttons, text="Salva nel DB Excel", 
+                                        command=self.save_to_excel_db,
+                                        bg="#4CAF50", fg="white", padx=20, pady=8, font=("", 10),
+                                        state=excel_button_state)
+        self.save_to_excel_btn.pack(side=tk.LEFT, padx=10)
         
         self.save_btn = tk.Button(centered_buttons, text="Salva XML", command=self.save_xml,
                                 bg="#FFC107", fg="black", padx=20, pady=8, font=("", 10, "bold"))
@@ -2358,7 +2384,89 @@ class FatturaViewer(tk.Tk):
             
             # Disabilita il pulsante Gestisci Fatture
             self.excel_manage_btn.config(state=tk.DISABLED)
+
+
+
+    def save_to_excel_db(self):
+        """Salva la fattura corrente nel database Excel direttamente dal form di modifica"""
+        if not self.xml_doc:
+            messagebox.showerror("Errore", "Nessun documento XML da salvare")
+            return
+        
+        # Verifica se è stato impostato un database Excel
+        if not self.excel_manager.excel_path:
+            # Chiedi all'utente se vuole creare un nuovo file o caricarne uno esistente
+            choice = messagebox.askquestion("Database Excel",
+                                        "Non è stato specificato un database Excel.\n\n" +
+                                        "Vuoi crearne uno nuovo?\n\n" +
+                                        "Seleziona 'Sì' per creare un nuovo database Excel, " +
+                                        "'No' per selezionare un database esistente.")
+            
+            if choice == 'yes':
+                # Crea un nuovo database Excel
+                self.create_excel_db()
+            else:
+                # Carica un database esistente
+                self.load_excel_db()
+        
+        # Controlla nuovamente se dopo le azioni dell'utente c'è un percorso Excel valido
+        if not self.excel_manager.excel_path:
+            self.log("Operazione annullata: nessun database Excel specificato")
+            return
+        
+        # Applica le modifiche correnti prima di salvare
+        if hasattr(self, 'save_current_line_data'):
+            self.save_current_line_data()
+        
+        # Aggiorna l'XML con le modifiche dai campi del form
+        modifiche_effettuate = []
+        for xpath, field_data in list(self.edit_fields.items()):
+            widget = field_data["widget"]
+            element = field_data["element"]
+            try:
+                new_value = widget.get()
+            except (tk.TclError, AttributeError):
+                continue
+            if element is not None:
+                old_value = element.text or ""
+                if old_value != new_value:
+                    element.text = new_value
+                    element_name = element.tag.split('}')[-1]
+                    modifiche_effettuate.append((element_name, old_value, new_value))
+        
+        # Aggiorna l'XML con le modifiche delle linee di dettaglio
+        for line_index, line_data in self.line_modifications.items():
+            for xpath, new_value in line_data.items():
+                elements = self.xml_doc.getroot().xpath(xpath, namespaces=self.NS)
+                if elements:
+                    elements[0].text = new_value
+        
+        try:
+            # Esporta l'XML aggiornato nel database Excel
+            success = self.excel_manager.export_xml_to_excel(self.xml_doc)
+            
+            if success:
+                messagebox.showinfo("Salvataggio completato", 
+                                "La fattura è stata salvata con successo nel database Excel.")
+                
+                # Chiedi se l'utente vuole anche salvare il file XML
+                save_xml_too = messagebox.askyesno("Salvataggio XML", 
+                                                "Vuoi salvare anche il file XML?")
+                if save_xml_too:
+                    self.save_xml()  # Chiama il metodo per salvare anche l'XML
+                else:
+                    # Esci dalla modalità di modifica senza salvare il file XML
+                    self.cancel_edit()
                     
+            else:
+                messagebox.showerror("Errore", 
+                                "Si è verificato un errore durante il salvataggio nel database Excel.")
+        
+        except Exception as e:
+            self.log(f"Errore nel salvataggio nel database Excel: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nel salvataggio nel database Excel:\n{str(e)}")
+                                
 if __name__ == "__main__":
     app = FatturaViewer()
     app.mainloop()
