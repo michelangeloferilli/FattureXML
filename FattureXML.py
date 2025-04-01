@@ -154,37 +154,49 @@ class FatturaViewer(tk.Tk):
         self.content_frame = tk.Frame(main_frame)
         self.content_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        tk.Label(left_frame, text="File XML:").pack(anchor=tk.W, pady=(0, 5))
-        xml_btn = tk.Button(left_frame, text="Seleziona Fattura XML", command=self.select_xml, width=20)
+        # Sezione File XML
+        xml_section = tk.LabelFrame(left_frame, text="File XML", padx=5, pady=5)
+        xml_section.pack(fill=tk.X, padx=0, pady=(0, 10))
+        
+        xml_btn = tk.Button(xml_section, text="Seleziona Fattura XML", command=self.select_xml, width=20)
         xml_btn.pack(anchor=tk.W, pady=(0, 5))
         
-        # Nuovo pulsante per caricare il modello
-        template_btn = tk.Button(left_frame, text="Carica Modello", command=self.load_template, 
+        template_btn = tk.Button(xml_section, text="Carica Modello", command=self.load_template, 
                             bg="#8BC34A", fg="white", width=20)
-        template_btn.pack(anchor=tk.W, pady=(0, 15))
-
-        # Aggiunta dei pulsanti Excel
-        excel_export_btn = tk.Button(left_frame, text="Esporta in Excel", command=self.export_to_excel,
-                                    bg="#2196F3", fg="white", width=20)
+        template_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Sezione Excel
+        excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
+        excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
+        
+        excel_export_btn = tk.Button(excel_section, text="Esporta in Excel", command=self.export_to_excel,
+                                bg="#2196F3", fg="white", width=20)
         excel_export_btn.pack(anchor=tk.W, pady=(0, 5))
         
-        excel_import_btn = tk.Button(left_frame, text="XML da Excel", command=self.create_xml_from_excel,
+        excel_import_btn = tk.Button(excel_section, text="XML da Excel", command=self.create_xml_from_excel,
                                 bg="#9C27B0", fg="white", width=20)
-        excel_import_btn.pack(anchor=tk.W, pady=(0, 15))        
+        excel_import_btn.pack(anchor=tk.W, pady=(0, 5))
         
-        tk.Label(left_frame, text="Foglio di stile:").pack(anchor=tk.W, pady=(0, 5))
+        excel_manage_btn = tk.Button(excel_section, text="Gestisci Fatture", command=self.manage_invoices,
+                                bg="#FF9800", fg="white", width=20)
+        excel_manage_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Sezione Foglio di stile
+        xsl_section = tk.LabelFrame(left_frame, text="Foglio di stile", padx=5, pady=5)
+        xsl_section.pack(fill=tk.X, padx=0, pady=(0, 10))
+        
         self.xsl_var = tk.StringVar()
-        self.xsl_dropdown = ttk.Combobox(left_frame, textvariable=self.xsl_var, width=20, state="readonly")
+        self.xsl_dropdown = ttk.Combobox(xsl_section, textvariable=self.xsl_var, width=20, state="readonly")
         self.xsl_dropdown["values"] = []
-        self.xsl_dropdown.pack(anchor=tk.W, pady=(0, 15))
+        self.xsl_dropdown.pack(anchor=tk.W, pady=(0, 5))
         self.xsl_dropdown.bind("<<ComboboxSelected>>", self.on_xsl_selected)
         
-        view_btn = tk.Button(left_frame, text="Visualizza Fattura", command=self.transform_and_view, 
-                             bg="#4CAF50", fg="white", width=20, padx=5, pady=5)
+        view_btn = tk.Button(xsl_section, text="Visualizza Fattura", command=self.transform_and_view, 
+                            bg="#4CAF50", fg="white", width=20)
         view_btn.pack(anchor=tk.W, pady=(5, 5))
         
-        edit_btn = tk.Button(left_frame, text="Modifica Fattura", command=self.edit_invoice, 
-                             bg="#2196F3", fg="white", width=20, padx=5, pady=5)
+        edit_btn = tk.Button(xsl_section, text="Modifica Fattura", command=self.edit_invoice, 
+                            bg="#2196F3", fg="white", width=20)
         edit_btn.pack(anchor=tk.W, pady=(5, 5))
         
         info_frame = tk.LabelFrame(self.content_frame, text="Informazioni sui file")
@@ -1663,10 +1675,7 @@ class FatturaViewer(tk.Tk):
     def create_xml_from_excel(self):
         """Crea un nuovo file XML dai dati in Excel"""
         try:
-            # Se è disponibile un file XML modello, usalo come template
-            template_path = self.xml_path if self.xml_doc else None
-            
-            success, new_xml_path = self.excel_manager.import_excel_to_xml(template_path)
+            success, new_xml_path = self.excel_manager.import_excel_to_xml()
             
             if success and new_xml_path:
                 # Chiedi all'utente se vuole caricare il nuovo file XML
@@ -1689,7 +1698,189 @@ class FatturaViewer(tk.Tk):
             traceback.print_exc()
             messagebox.showerror("Errore", f"Errore nella creazione del file XML da Excel:\n{str(e)}")
 
+    def manage_invoices(self):
+        """Mostra una finestra per gestire le fatture in Excel"""
+        try:
+            # Verifica che il file Excel esista
+            excel_path = self.excel_manager.excel_path
+            if not os.path.exists(excel_path):
+                messagebox.showinfo("Informazione", 
+                                f"Il file Excel non esiste ancora.\nEsporta prima una fattura in Excel.")
+                return
             
+            # Ottieni l'elenco delle fatture
+            invoices = self.excel_manager.list_invoices()
+            if not invoices:
+                messagebox.showinfo("Informazione", "Nessuna fattura trovata nel file Excel")
+                return
+            
+            # Crea una finestra di dialogo per la gestione
+            manager = tk.Toplevel(self)
+            manager.title("Gestione Fatture in Excel")
+            manager.geometry("800x500")
+            manager.transient(self)
+            manager.grab_set()
+            
+            # Frame principale
+            main_frame = tk.Frame(manager)
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+            
+            # Intestazione
+            header = tk.Label(main_frame, text="Fatture salvate in Excel", font=("", 12, "bold"))
+            header.pack(fill=tk.X, pady=(0, 10))
+            
+            # Frame per la tabella con scrollbar
+            table_frame = tk.Frame(main_frame)
+            table_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+            
+            # Scrollbar
+            scrollbar = tk.Scrollbar(table_frame)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # Treeview per visualizzare le fatture
+            columns = ("id", "numero", "data", "cedente", "cessionario")
+            tree = ttk.Treeview(table_frame, columns=columns, show='headings', yscrollcommand=scrollbar.set)
+            
+            # Configurazione colonne
+            tree.heading("id", text="ID")
+            tree.heading("numero", text="Numero Fattura")
+            tree.heading("data", text="Data")
+            tree.heading("cedente", text="Cedente")
+            tree.heading("cessionario", text="Cessionario")
+            
+            tree.column("id", width=80, anchor="w")
+            tree.column("numero", width=100, anchor="w")
+            tree.column("data", width=100, anchor="w")
+            tree.column("cedente", width=200, anchor="w")
+            tree.column("cessionario", width=200, anchor="w")
+            
+            # Nascondi la colonna ID
+            tree.column("id", width=0, stretch=tk.NO)
+            
+            # Popola la tabella
+            for invoice in invoices:
+                tree.insert("", tk.END, values=invoice)
+            
+            tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.config(command=tree.yview)
+            
+            # Frame per i pulsanti
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            # Funzioni per le azioni sui pulsanti
+            def create_xml():
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Attenzione", "Seleziona prima una fattura")
+                    return
+                
+                item = tree.item(selection[0])
+                invoice_id = item["values"][0]
+                
+                # Chiedi il percorso di salvataggio
+                output_path = filedialog.asksaveasfilename(
+                    title="Salva il nuovo file XML",
+                    defaultextension=".xml",
+                    filetypes=[("File XML", "*.xml")]
+                )
+                if not output_path:
+                    return
+                
+                # Crea il file XML
+                success, new_xml_path = self.excel_manager.create_xml_from_excel_by_id(invoice_id, output_path)
+                
+                if success:
+                    result = messagebox.askyesno("File XML creato", 
+                                            f"Il file XML è stato creato con successo.\n\nVuoi caricarlo ora?")
+                    if result:
+                        # Carica il nuovo file XML
+                        self.xml_path = new_xml_path
+                        self.xml_label.config(text=os.path.basename(new_xml_path))
+                        self.log(f"File XML creato e caricato: {new_xml_path}")
+                        
+                        try:
+                            self.xml_doc = etree.parse(new_xml_path)
+                            self.log("Nuovo file XML caricato con successo")
+                            manager.destroy()  # Chiudi la finestra
+                        except Exception as e:
+                            self.log(f"Errore nel caricamento del nuovo file XML: {str(e)}")
+                            self.xml_doc = None
+            
+            def delete_invoice():
+                selection = tree.selection()
+                if not selection:
+                    messagebox.showwarning("Attenzione", "Seleziona prima una fattura")
+                    return
+                
+                item = tree.item(selection[0])
+                invoice_id = item["values"][0]
+                invoice_numero = item["values"][1]
+                
+                # Chiedi conferma
+                result = messagebox.askyesno("Conferma eliminazione", 
+                                            f"Sei sicuro di voler eliminare la fattura {invoice_numero}?")
+                if not result:
+                    return
+                
+                # Elimina la fattura
+                success = self.excel_manager.delete_invoice(invoice_id)
+                
+                if success:
+                    messagebox.showinfo("Eliminazione completata", 
+                                    f"La fattura {invoice_numero} è stata eliminata con successo")
+                    # Rimuovi dalla tabella
+                    tree.delete(selection[0])
+                else:
+                    messagebox.showerror("Errore", 
+                                    f"Si è verificato un errore durante l'eliminazione della fattura")
+            
+            def open_excel():
+                # Apri il file Excel con l'applicazione predefinita
+                try:
+                    excel_path = self.excel_manager.excel_path
+                    if os.path.exists(excel_path):
+                        os.startfile(excel_path)
+                    else:
+                        messagebox.showinfo("Informazione", "File Excel non trovato")
+                except Exception as e:
+                    messagebox.showerror("Errore", f"Impossibile aprire il file Excel:\n{str(e)}")
+            
+            def refresh_list():
+                # Aggiorna l'elenco delle fatture
+                tree.delete(*tree.get_children())
+                invoices = self.excel_manager.list_invoices()
+                for invoice in invoices:
+                    tree.insert("", tk.END, values=invoice)
+            
+            # Pulsanti azioni
+            create_btn = tk.Button(button_frame, text="Crea XML", command=create_xml,
+                                bg="#4CAF50", fg="white", width=15, padx=5, pady=5)
+            create_btn.pack(side=tk.LEFT, padx=(0, 5))
+            
+            delete_btn = tk.Button(button_frame, text="Elimina", command=delete_invoice,
+                                bg="#F44336", fg="white", width=15, padx=5, pady=5)
+            delete_btn.pack(side=tk.LEFT, padx=5)
+            
+            excel_btn = tk.Button(button_frame, text="Apri Excel", command=open_excel,
+                                bg="#2196F3", fg="white", width=15, padx=5, pady=5)
+            excel_btn.pack(side=tk.LEFT, padx=5)
+            
+            refresh_btn = tk.Button(button_frame, text="Aggiorna", command=refresh_list,
+                                bg="#FF9800", fg="white", width=15, padx=5, pady=5)
+            refresh_btn.pack(side=tk.LEFT, padx=5)
+            
+            close_btn = tk.Button(button_frame, text="Chiudi", command=manager.destroy,
+                                width=15, padx=5, pady=5)
+            close_btn.pack(side=tk.RIGHT, padx=5)
+            
+            # Gestione doppio click su riga
+            tree.bind("<Double-1>", lambda e: create_xml())
+            
+        except Exception as e:
+            self.log(f"Errore nella gestione delle fatture in Excel: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nella gestione delle fatture in Excel:\n{str(e)}")
                         
 if __name__ == "__main__":
     app = FatturaViewer()
