@@ -1,3 +1,4 @@
+from excel_xml_manager import ExcelXmlManager
 from autocomplete_comuni import AutocompleteComune
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
@@ -38,6 +39,8 @@ class FatturaViewer(tk.Tk):
         # Definizione statica del namespace:
         # Anche se nel file XML gli elementi non mostrano il prefisso, questi sono comunque in questo namespace.
         self.NS = {"p": "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2"}
+        # Inizializza il manager Excel-XML
+        self.excel_manager = ExcelXmlManager(self, self.NS)
         
         self.create_widgets()
         self.find_xsl_files()
@@ -153,7 +156,21 @@ class FatturaViewer(tk.Tk):
         
         tk.Label(left_frame, text="File XML:").pack(anchor=tk.W, pady=(0, 5))
         xml_btn = tk.Button(left_frame, text="Seleziona Fattura XML", command=self.select_xml, width=20)
-        xml_btn.pack(anchor=tk.W, pady=(0, 15))
+        xml_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        # Nuovo pulsante per caricare il modello
+        template_btn = tk.Button(left_frame, text="Carica Modello", command=self.load_template, 
+                            bg="#8BC34A", fg="white", width=20)
+        template_btn.pack(anchor=tk.W, pady=(0, 15))
+
+        # Aggiunta dei pulsanti Excel
+        excel_export_btn = tk.Button(left_frame, text="Esporta in Excel", command=self.export_to_excel,
+                                    bg="#2196F3", fg="white", width=20)
+        excel_export_btn.pack(anchor=tk.W, pady=(0, 5))
+        
+        excel_import_btn = tk.Button(left_frame, text="XML da Excel", command=self.create_xml_from_excel,
+                                bg="#9C27B0", fg="white", width=20)
+        excel_import_btn.pack(anchor=tk.W, pady=(0, 15))        
         
         tk.Label(left_frame, text="Foglio di stile:").pack(anchor=tk.W, pady=(0, 5))
         self.xsl_var = tk.StringVar()
@@ -1594,8 +1611,86 @@ class FatturaViewer(tk.Tk):
                 self.log(f"Imposta ricalcolata: {imposta_formatted}")
         except Exception as e:
             self.log(f"Errore nel calcolo dell'imposta: {str(e)}")
-            traceback.print_exc()        
+            traceback.print_exc()   
+
+    def load_template(self):
+        """Carica un modello di fattura precompilato dalla cartella del progetto"""
+        try:
+            template_path = os.path.join(self.project_dir, "modelloFattura.xml")
             
+            # Verifica che il file esista
+            if not os.path.exists(template_path):
+                self.log(f"Errore: File modello non trovato in {template_path}")
+                messagebox.showerror("Errore", f"File modello non trovato.\nPercorso cercato: {template_path}")
+                return
+                
+            # Carica il file modello
+            self.xml_path = template_path
+            self.xml_label.config(text=os.path.basename(template_path))
+            self.log(f"File modello caricato: {template_path}")
+            
+            try:
+                self.xml_doc = etree.parse(template_path)
+                self.log("File modello XML caricato con successo")
+                messagebox.showinfo("Modello Caricato", "Il modello di fattura è stato caricato con successo.")
+            except Exception as e:
+                self.log(f"Errore nel caricamento del file modello XML: {str(e)}")
+                self.xml_doc = None
+                messagebox.showerror("Errore", f"Errore nel caricamento del file modello XML:\n{str(e)}")
+        except Exception as e:
+            self.log(f"Errore nel caricamento del modello: {str(e)}")
+            messagebox.showerror("Errore", f"Errore nel caricamento del modello:\n{str(e)}")     
+            
+    def export_to_excel(self):
+        """Esporta i dati del file XML attuale in Excel"""
+        if not self.xml_path or not self.xml_doc:
+            messagebox.showerror("Errore", "Seleziona prima un file XML valido")
+            return
+        
+        try:
+            success = self.excel_manager.export_xml_to_excel(self.xml_doc)
+            if success:
+                messagebox.showinfo("Esportazione completata", 
+                                f"I dati sono stati esportati con successo nel file Excel")
+            else:
+                messagebox.showerror("Errore", 
+                                    "Si è verificato un errore durante l'esportazione in Excel")
+        except Exception as e:
+            self.log(f"Errore nell'esportazione in Excel: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nell'esportazione in Excel:\n{str(e)}")
+
+    def create_xml_from_excel(self):
+        """Crea un nuovo file XML dai dati in Excel"""
+        try:
+            # Se è disponibile un file XML modello, usalo come template
+            template_path = self.xml_path if self.xml_doc else None
+            
+            success, new_xml_path = self.excel_manager.import_excel_to_xml(template_path)
+            
+            if success and new_xml_path:
+                # Chiedi all'utente se vuole caricare il nuovo file XML
+                result = messagebox.askyesno("File XML creato", 
+                                            f"Il file XML è stato creato con successo.\n\nVuoi caricarlo ora?")
+                if result:
+                    # Carica il nuovo file XML
+                    self.xml_path = new_xml_path
+                    self.xml_label.config(text=os.path.basename(new_xml_path))
+                    self.log(f"File XML creato e caricato: {new_xml_path}")
+                    
+                    try:
+                        self.xml_doc = etree.parse(new_xml_path)
+                        self.log("Nuovo file XML caricato con successo")
+                    except Exception as e:
+                        self.log(f"Errore nel caricamento del nuovo file XML: {str(e)}")
+                        self.xml_doc = None
+        except Exception as e:
+            self.log(f"Errore nella creazione del file XML da Excel: {str(e)}")
+            traceback.print_exc()
+            messagebox.showerror("Errore", f"Errore nella creazione del file XML da Excel:\n{str(e)}")
+
+            
+                        
 if __name__ == "__main__":
     app = FatturaViewer()
     app.mainloop()

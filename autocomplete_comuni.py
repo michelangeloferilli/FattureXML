@@ -8,66 +8,77 @@ class AutocompleteComune:
     Widget personalizzato per l'autocompletamento dei comuni italiani 
     utilizzando Entry + Listbox per massima flessibilità.
     """
+
+    _comuni_data = {}
+    _database_loaded = False
+    _thread_lock = threading.Lock()    
     def __init__(self, parent, comune_var, provincia_var, cap_var, width=30):
-        self.parent = parent
-        self.comune_var = comune_var
-        self.provincia_var = provincia_var
-        self.cap_var = cap_var
-        self.width = width
-        
-        # Frame contenitore per il widget di autocompletamento
-        self.frame = Frame(parent)
-        
-        # Entry field per l'input
-        self.comune_entry = Entry(self.frame, width=width, textvariable=comune_var)
-        self.comune_entry.pack(side="left", fill="x", expand=True)
-        
-        # Pulsante per attivare la ricerca
-        self.search_button = Button(self.frame, text="🔍", command=self.toggle_dropdown, width=2)
-        self.search_button.pack(side="right")
-        
-        # Stato del dropdown
-        self.dropdown_visible = False
-        self.dropdown_window = None
-        self.listbox = None
-        self.scrollbar = None
-        
-        # Timer per debounce
-        self.update_timer_id = None
-        
-        # Carica il database dei comuni
-        self.comuni_data = {}
-        self.thread_lock = threading.Lock()
-        
-        # Crea subito un database di esempio
-        self.create_sample_database()
-        
-        # Avvia il caricamento del database completo in un thread separato
-        threading.Thread(target=self.load_comuni_database, daemon=True).start()
-        
-        # Collegamento eventi base
-        self.comune_entry.bind("<KeyRelease>", self.on_keyrelease)
-        
-        # Navigazione con frecce
-        self.comune_entry.bind("<Down>", self.on_down_arrow)
-        self.comune_entry.bind("<Up>", self.on_up_arrow)
-        self.comune_entry.bind("<Return>", self.on_entry_return)
-        self.comune_entry.bind("<Escape>", lambda e: self.hide_dropdown())
-        
-        # Traccia cambiamenti nella variabile
-        self.comune_var.trace_add('write', self.on_variable_change)
+            self.parent = parent
+            self.comune_var = comune_var
+            self.provincia_var = provincia_var
+            self.cap_var = cap_var
+            self.width = width
+            
+            # Frame contenitore per il widget di autocompletamento
+            self.frame = Frame(parent)
+            
+            # Entry field per l'input
+            self.comune_entry = Entry(self.frame, width=width, textvariable=comune_var)
+            self.comune_entry.pack(side="left", fill="x", expand=True)
+            
+            # Pulsante per attivare la ricerca
+            self.search_button = Button(self.frame, text="🔍", command=self.toggle_dropdown, width=2)
+            self.search_button.pack(side="right")
+            
+            # Stato del dropdown
+            self.dropdown_visible = False
+            self.dropdown_window = None
+            self.listbox = None
+            self.scrollbar = None
+            
+            # Timer per debounce
+            self.update_timer_id = None
+            
+            # Usa il lock condiviso a livello di classe
+            self.thread_lock = AutocompleteComune._thread_lock
+            
+            # Crea subito un database di esempio se non è stato già caricato
+            if not AutocompleteComune._database_loaded:
+                self.create_sample_database()
+                # Avvia il caricamento del database completo in un thread separato
+                threading.Thread(target=self.load_comuni_database, daemon=True).start()
+            
+            # Collegamento eventi base
+            self.comune_entry.bind("<KeyRelease>", self.on_keyrelease)
+            
+            # Navigazione con frecce
+            self.comune_entry.bind("<Down>", self.on_down_arrow)
+            self.comune_entry.bind("<Up>", self.on_up_arrow)
+            self.comune_entry.bind("<Return>", self.on_entry_return)
+            self.comune_entry.bind("<Escape>", lambda e: self.hide_dropdown())
+            
+            # Traccia cambiamenti nella variabile
+            self.comune_var.trace_add('write', self.on_variable_change)
     
     def load_comuni_database(self):
         """Carica il database dei comuni da file locale"""
         try:
-            db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "comuni_italiani.json")
-            
-            if os.path.exists(db_path):
-                print(f"[AutocompleteComune] Trovato database locale: {db_path}")
-                with open(db_path, 'r', encoding='utf-8') as f:
-                    with self.thread_lock:
-                        self.comuni_data = json.load(f)
-                    print(f"[AutocompleteComune] Caricati {len(self.comuni_data)} comuni dal database locale")
+            # Usa il lock per accedere alla variabile di classe
+            with self.thread_lock:
+                # Controlla se il database è già stato caricato
+                if AutocompleteComune._database_loaded:
+                    print("[AutocompleteComune] Database già caricato, utilizzo dati esistenti")
+                    return
+                    
+                db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "comuni_italiani.json")
+                
+                if os.path.exists(db_path):
+                    print(f"[AutocompleteComune] Trovato database locale: {db_path}")
+                    with open(db_path, 'r', encoding='utf-8') as f:
+                        AutocompleteComune._comuni_data = json.load(f)
+                    print(f"[AutocompleteComune] Caricati {len(AutocompleteComune._comuni_data)} comuni dal database locale")
+                    # Imposta il flag di caricamento
+                    AutocompleteComune._database_loaded = True
         except Exception as e:
             print(f"[AutocompleteComune] Errore nel caricamento del database comuni: {str(e)}")
     
@@ -87,24 +98,25 @@ class AutocompleteComune:
         }
         
         with self.thread_lock:
-            self.comuni_data = sample_data
-            print(f"[AutocompleteComune] Creato database di esempio con {len(self.comuni_data)} comuni")
+            if not AutocompleteComune._database_loaded:
+                AutocompleteComune._comuni_data = sample_data
+                print(f"[AutocompleteComune] Creato database di esempio con {len(AutocompleteComune._comuni_data)} comuni")
     
     def get_suggestions(self, text_to_search=""):
         """Ottiene suggerimenti in base al testo inserito"""
         with self.thread_lock:
             if not text_to_search:
                 # Se non c'è testo, ritorna tutti i comuni (fino a un massimo)
-                return sorted(list(self.comuni_data.keys()))[:100]
+                return sorted(list(AutocompleteComune._comuni_data.keys()))[:100]
             
             text_lower = text_to_search.lower()
             # Cerca comuni che iniziano con il testo inserito
-            suggestions = [comune for comune in self.comuni_data.keys() 
+            suggestions = [comune for comune in AutocompleteComune._comuni_data.keys() 
                           if comune.lower().startswith(text_lower)]
             
             # Se non ci sono abbastanza risultati, cerca anche quelli che contengono il testo
             if len(suggestions) < 10:
-                additional = [comune for comune in self.comuni_data.keys() 
+                additional = [comune for comune in AutocompleteComune._comuni_data.keys() 
                              if comune.lower().find(text_lower) != -1 and comune not in suggestions]
                 suggestions.extend(additional[:10-len(suggestions)])
             
@@ -517,14 +529,14 @@ class AutocompleteComune:
     def aggiorna_provincia_cap(self, comune):
         """Aggiorna i campi provincia e CAP in base al comune selezionato"""
         with self.thread_lock:
-            if comune in self.comuni_data:
+            if comune in AutocompleteComune._comuni_data:
                 # Imposta la provincia
-                if 'provincia' in self.comuni_data[comune]:
-                    self.provincia_var.set(self.comuni_data[comune]['provincia'])
+                if 'provincia' in AutocompleteComune._comuni_data[comune]:
+                    self.provincia_var.set(AutocompleteComune._comuni_data[comune]['provincia'])
                 
                 # Imposta il CAP (prende il primo disponibile per semplicità)
-                if 'cap' in self.comuni_data[comune] and self.comuni_data[comune]['cap']:
-                    self.cap_var.set(self.comuni_data[comune]['cap'][0])
+                if 'cap' in AutocompleteComune._comuni_data[comune] and AutocompleteComune._comuni_data[comune]['cap']:
+                    self.cap_var.set(AutocompleteComune._comuni_data[comune]['cap'][0])
                     
                 return True
         
