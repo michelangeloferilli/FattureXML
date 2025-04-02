@@ -172,10 +172,6 @@ class FatturaViewer(tk.Tk):
                             bg="#8BC34A", fg="white", width=20)
         template_btn.pack(anchor=tk.W, pady=(0, 5))
         
-        # Salva il riferimento al pulsante edit_btn e lo inizializza come disabilitato
-        self.edit_btn = tk.Button(xml_section, text="Modifica Fattura", command=self.edit_invoice, 
-                            bg="#2196F3", fg="white", width=20, state=tk.DISABLED)
-        self.edit_btn.pack(anchor=tk.W, pady=(0, 5))
         
         # Sezione Foglio di stile
         xsl_section = tk.LabelFrame(left_frame, text="Foglio di stile", padx=5, pady=5)
@@ -197,8 +193,8 @@ class FatturaViewer(tk.Tk):
         excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
             
         # Sezione Excel - Aggiungere l'etichetta per il database
-        excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
-        excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
+        #excel_section = tk.LabelFrame(left_frame, text="Gestione Excel", padx=5, pady=5)
+        #excel_section.pack(fill=tk.X, padx=0, pady=(0, 10))
         
         # Pulsante per caricare un database Excel esistente
         excel_load_btn = tk.Button(excel_section, text="Carica DB Excel", command=self.load_excel_db,
@@ -218,10 +214,6 @@ class FatturaViewer(tk.Tk):
         self.excel_db_label = tk.Label(db_label_frame, text="Non specificato", fg="gray", anchor="w")
         self.excel_db_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # Salva il riferimento al pulsante excel_save_btn e lo inizializza come disabilitato
-        self.excel_save_btn = tk.Button(excel_section, text="Salva in Excel", command=self.export_to_excel,
-                                bg="#2196F3", fg="white", width=20, state=tk.DISABLED)
-        self.excel_save_btn.pack(anchor=tk.W, pady=(0, 5))
         
         # Salva il riferimento al pulsante excel_manage_btn e lo inizializza come disabilitato
         self.excel_manage_btn = tk.Button(excel_section, text="Gestisci Fatture", command=self.manage_invoices,
@@ -324,6 +316,9 @@ class FatturaViewer(tk.Tk):
                 self.log("File XML caricato con successo")
                 # Aggiorna lo stato dei pulsanti
                 self.update_button_states()
+                # Entra direttamente in modalità modifica
+                self.edit_invoice()
+
             except Exception as e:
                 self.log(f"Errore nel caricamento del file XML: {str(e)}")
                 self.xml_doc = None
@@ -417,6 +412,11 @@ class FatturaViewer(tk.Tk):
         
         # Aggiorna i totali nel riepilogo
         self.update_riepilogo_totals()        
+        # Aggiorna lo stato del pulsante "Salva nel DB Excel" in base alla presenza di un DB Excel
+        excel_db_enabled = self.excel_manager.excel_path is not None and os.path.exists(self.excel_manager.excel_path)
+        if hasattr(self, 'save_to_excel_btn'):
+            self.save_to_excel_btn.config(state=tk.NORMAL if excel_db_enabled else tk.DISABLED)
+            
         self.log("Modalità modifica attivata")
 
 
@@ -445,6 +445,136 @@ class FatturaViewer(tk.Tk):
             "//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/DataScadenzaPagamento"
         ]
         
+
+        # Dizionario di valori per i menu a tendina
+        combobox_values = {
+            # TipoDocumento
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiGenerali/DatiGeneraliDocumento/TipoDocumento": [
+                "TD01 - Fattura",
+                "TD02 - Acconto/anticipo su fattura",
+                "TD03 - Acconto/anticipo su parcella",
+                "TD04 - Nota di credito",
+                "TD05 - Nota di debito",
+                "TD06 - Parcella",
+                "TD16 - Integrazione fattura reverse charge interno",
+                "TD17 - Integrazione/autofattura acquisto servizi estero",
+                "TD18 - Integrazione acquisto beni intracomunitari",
+                "TD19 - Integrazione/autofattura art.17 c.2 DPR 633/72",
+                "TD20 - Autofattura per regolarizzazione",
+                "TD21 - Autofattura per splafonamento",
+                "TD22 - Estrazione beni da Deposito IVA",
+                "TD23 - Estrazione beni da Deposito IVA con versamento IVA",
+                "TD24 - Fattura differita art.21 c.4 lett. a",
+                "TD25 - Fattura differita art.21 c.4 terzo periodo lett. b",
+                "TD26 - Cessione beni ammortizzabili/passaggi interni",
+                "TD27 - Fattura per autoconsumo/cessioni gratuite"
+            ],
+            
+            # RegimeFiscale
+            "//p:FatturaElettronica/FatturaElettronicaHeader/CedentePrestatore/DatiAnagrafici/RegimeFiscale": [
+                "RF01 - Ordinario",
+                "RF02 - Contribuenti minimi",
+                "RF04 - Agricoltura e attività connesse e pesca",
+                "RF05 - Vendita sali e tabacchi",
+                "RF06 - Commercio fiammiferi",
+                "RF07 - Editoria",
+                "RF08 - Gestione servizi telefonia pubblica",
+                "RF09 - Rivendita documenti di trasporto pubblico e di sosta",
+                "RF10 - Intrattenimenti, giochi e altre attività",
+                "RF11 - Agenzie viaggi e turismo",
+                "RF12 - Agriturismo",
+                "RF13 - Vendite a domicilio",
+                "RF14 - Rivendita beni usati, oggetti d'arte",
+                "RF15 - Agenzie di vendite all'asta",
+                "RF16 - IVA per cassa P.A.",
+                "RF17 - IVA per cassa art.32-bis DL 83/2012",
+                "RF18 - Altro",
+                "RF19 - Regime forfettario"
+            ],
+            
+            # StatoLiquidazione
+            "//p:FatturaElettronica/FatturaElettronicaHeader/CedentePrestatore/IscrizioneREA/StatoLiquidazione": [
+                "LS - In liquidazione",
+                "LN - Non in liquidazione"
+            ],
+            
+            # SocioUnico
+            "//p:FatturaElettronica/FatturaElettronicaHeader/CedentePrestatore/IscrizioneREA/SocioUnico": [
+                "SU - Socio unico",
+                "SM - Più soci"
+            ],
+            
+            # ModalitaPagamento
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/DettaglioPagamento/ModalitaPagamento": [
+                "MP01 - Contanti",
+                "MP02 - Assegno",
+                "MP03 - Assegno circolare",
+                "MP04 - Contanti presso Tesoreria",
+                "MP05 - Bonifico",
+                "MP06 - Vaglia cambiario",
+                "MP07 - Bollettino bancario",
+                "MP08 - Carta di pagamento",
+                "MP09 - RID",
+                "MP10 - RID utenze",
+                "MP11 - RID veloce",
+                "MP12 - RIBA",
+                "MP13 - MAV",
+                "MP14 - Quietanza erario",
+                "MP15 - Giroconto su conti di contabilità speciale",
+                "MP16 - Domiciliazione bancaria",
+                "MP17 - Domiciliazione postale",
+                "MP18 - Bollettino di c/c postale",
+                "MP19 - SEPA Direct Debit",
+                "MP20 - SEPA Direct Debit CORE",
+                "MP21 - SEPA Direct Debit B2B",
+                "MP22 - Trattenuta su somme già riscosse",
+                "MP23 - PagoPA"
+            ],
+            
+            # CondizioniPagamento
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiPagamento/CondizioniPagamento": [
+                "TP01 - Pagamento a rate",
+                "TP02 - Pagamento completo",
+                "TP03 - Anticipo"
+            ],
+            
+            # EsigibilitaIVA
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/EsigibilitaIVA": [
+                "I - Esigibilità immediata",
+                "D - Esigibilità differita",
+                "S - Scissione dei pagamenti"
+            ],
+            
+            # Natura
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/Natura": [
+                "N1 - Escluse ex art. 15",
+                "N2 - Non soggette",
+                "N2.1 - Non soggette ad IVA artt. da 7 a 7-septies",
+                "N2.2 - Non soggette - altri casi",
+                "N3 - Non imponibili",
+                "N3.1 - Non imponibili - esportazioni",
+                "N3.2 - Non imponibili - cessioni intracomunitarie",
+                "N3.3 - Non imponibili - cessioni verso S.Marino",
+                "N3.4 - Non imponibili - operazioni assimilate alle cessioni all'esportazione",
+                "N3.5 - Non imponibili - a seguito di dichiarazioni d'intento",
+                "N3.6 - Non imponibili - altre operazioni",
+                "N4 - Esenti",
+                "N5 - Regime del margine / IVA non esposta in fattura",
+                "N6 - Inversione contabile",
+                "N7 - IVA assolta in altro stato UE"
+            ],
+            
+            # Valori possibili per Aliquota IVA
+            "//p:FatturaElettronica/FatturaElettronicaBody/DatiBeniServizi/DatiRiepilogo/AliquotaIVA": [
+                "4.00", "5.00", "10.00", "22.00"
+            ]
+        }
+
+        # Funzione per estrarre il codice da una stringa descrittiva come "MP01 - Contanti"
+        def extract_code(value):
+            if " - " in value:
+                return value.split(" - ")[0].strip()
+            return value                
         # Valori possibili per Aliquota IVA
         aliquote_iva = ["4.00", "5.00", "10.00", "22.00"]
         
@@ -554,6 +684,40 @@ class FatturaViewer(tk.Tk):
                     # Usa il metodo create_date_field per creare il campo data
                     date_frame, entry_widget = self.create_date_field(section_frame, value, width=28)
                     date_frame.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+
+                # Verifica se è un campo con valori predefiniti per combobox
+                elif xpath in combobox_values:
+                    # Crea un combobox invece di un entry
+                    entry_widget = ttk.Combobox(section_frame, width=29, textvariable=string_var)
+                    entry_widget['values'] = combobox_values[xpath]
+                    
+                    # Trova il valore corrente nel combobox o imposta il primo valore
+                    if value:
+                        # Cerca un'opzione che contiene il valore corrente (per gestire sia codici che descrizioni complete)
+                        matching = [opt for opt in combobox_values[xpath] if opt.startswith(value) or value in opt]
+                        if matching:
+                            entry_widget.set(matching[0])
+                        else:
+                            # Se non c'è un match, imposta il valore così com'è
+                            entry_widget.set(value)
+                    
+                    entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    
+                    # Aggiungi una traccia per aggiornare il valore quando cambia la selezione
+                    def update_element_from_combobox(event, element=element, var=string_var, xpath=xpath):
+                        if element is not None:
+                            # Estrae solo il codice dalla selezione (es. "MP01" da "MP01 - Contanti")
+                            selected_value = var.get()
+                            code = extract_code(selected_value)
+                            element.text = code
+                            self.log(f"Aggiornato {xpath} con valore {code}")
+                            
+                            # Alcuni campi potrebbero richiedere aggiornamenti aggiuntivi
+                            if "AliquotaIVA" in xpath and hasattr(self, 'calcola_imposta'):
+                                self.calcola_imposta()
+                    
+                    entry_widget.bind("<<ComboboxSelected>>", update_element_from_combobox)
+                                    
                 else:
                     # Trattamento speciale per i campi Comune, Provincia e CAP
                     if "Comune" in label and section_title in ["Cedente/Prestatore", "Cessionario/Committente"]:
@@ -624,28 +788,38 @@ class FatturaViewer(tk.Tk):
                 label_widget.grid(row=i, column=0, sticky="w", padx=5, pady=2)
                 
                 # Per AliquotaIVA creiamo un Combobox invece di un Entry
-                if "AliquotaIVA" in xpath:
-                    entry_widget = ttk.Combobox(section_frame, width=29, state="readonly")
-                    entry_widget['values'] = aliquote_iva
+                # Verifica se è un campo con valori predefiniti per combobox
+                if xpath in combobox_values:
+                    # Crea un combobox invece di un entry
+                    entry_widget = ttk.Combobox(section_frame, width=29)
+                    entry_widget['values'] = combobox_values[xpath]
                     
-                    # Trova il valore corrispondente nella lista o seleziona quello più vicino
-                    if value in aliquote_iva:
-                        entry_widget.set(value)
-                    else:
-                        # Se non troviamo un match esatto, cerchiamo il più vicino
-                        try:
-                            if value:
-                                val_float = float(value)
-                                closest = min(aliquote_iva, key=lambda x: abs(float(x) - val_float))
-                                entry_widget.set(closest)
-                            else:
-                                # Default a 22% se non c'è un valore
-                                entry_widget.set("22.00")
-                        except:
-                            # In caso di errore, default a 22%
-                            entry_widget.set("22.00")                 
+                    # Trova il valore corrente nel combobox o imposta il primo valore
+                    if value:
+                        # Cerca un'opzione che contiene il valore corrente (per gestire sia codici che descrizioni complete)
+                        matching = [opt for opt in combobox_values[xpath] if opt.startswith(value) or value in opt]
+                        if matching:
+                            entry_widget.set(matching[0])
+                        else:
+                            # Se non c'è un match, imposta il valore così com'è
+                            entry_widget.set(value)
                     
                     entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
+                    
+                    # Aggiungi una traccia per aggiornare il valore quando cambia la selezione
+                    def update_element_from_combobox(event, e=element, widget=entry_widget, xp=xpath):
+                        if e is not None:
+                            # Estrae solo il codice dalla selezione (es. "MP01" da "MP01 - Contanti")
+                            selected_value = widget.get()
+                            code = extract_code(selected_value)
+                            e.text = code
+                            self.log(f"Aggiornato {xp} con valore {code}")
+                            
+                            # Alcuni campi potrebbero richiedere aggiornamenti aggiuntivi
+                            if "AliquotaIVA" in xp and hasattr(self, 'calcola_imposta'):
+                                self.calcola_imposta()
+                    
+                    entry_widget.bind("<<ComboboxSelected>>", update_element_from_combobox)
                     
                     # Se siamo nella sezione Dati Riepilogo, tieni traccia del widget
                     if section_title == "Dati Riepilogo":
@@ -662,10 +836,6 @@ class FatturaViewer(tk.Tk):
                     # Per tutti gli altri campi, mantieni il comportamento originale
                     entry_widget = tk.Entry(section_frame, width=30)
                     entry_widget.insert(0, value)
-
-
-
-
                     entry_widget.grid(row=i, column=1, sticky="ew", padx=5, pady=2)
                     
                     # Tieni traccia dei campi imponibile e imposta nella sezione Dati Riepilogo
@@ -823,7 +993,7 @@ class FatturaViewer(tk.Tk):
         self.cancel_btn.pack(side=tk.LEFT, padx=10)
         
         # Pulsante Salva nel DB Excel
-        excel_db_enabled = self.excel_manager.excel_path is not None
+        excel_db_enabled = self.excel_manager.excel_path is not None and os.path.exists(self.excel_manager.excel_path)
         excel_button_state = tk.NORMAL if excel_db_enabled else tk.DISABLED
         
         self.save_to_excel_btn = tk.Button(centered_buttons, text="Salva nel DB Excel", 
@@ -884,14 +1054,27 @@ class FatturaViewer(tk.Tk):
         if hasattr(self, 'save_current_line_data'):
             self.save_current_line_data()
         
+        # Funzione per estrarre il codice da una stringa descrittiva come "MP01 - Contanti"
+        def extract_code(value):
+            if isinstance(value, str) and " - " in value:
+                return value.split(" - ")[0].strip()
+            return value
+        
         modifiche_effettuate = []
         for xpath, field_data in list(self.edit_fields.items()):
             widget = field_data["widget"]
             element = field_data["element"]
             try:
-                new_value = widget.get()
+                # Gestione diversa in base al tipo di widget
+                if isinstance(widget, ttk.Combobox):
+                    # Per i combobox, estrai solo il codice
+                    new_value = extract_code(widget.get())
+                else:
+                    # Per gli altri widget, ottieni il valore normalmente
+                    new_value = widget.get()
             except (tk.TclError, AttributeError):
                 continue
+                
             if element is not None:
                 old_value = element.text or ""
                 if old_value != new_value:
@@ -903,6 +1086,9 @@ class FatturaViewer(tk.Tk):
             for xpath, new_value in line_data.items():
                 elements = self.xml_doc.getroot().xpath(xpath, namespaces=self.NS)
                 if elements:
+                    # Se il valore proviene da un combobox, estrai solo il codice
+                    if isinstance(new_value, str) and " - " in new_value:
+                        new_value = extract_code(new_value)
                     elements[0].text = new_value
         
         output_path = filedialog.asksaveasfilename(
@@ -971,7 +1157,7 @@ class FatturaViewer(tk.Tk):
             except Exception as e:
                 self.log(f"Errore nel salvataggio del file: {str(e)}")
                 messagebox.showerror("Errore", f"Errore nel salvataggio del file:\n{str(e)}")
-  
+                
     def cancel_edit(self):
         # Rimuovi il binding della rotellina del mouse
         self.unbind_all("<MouseWheel>")
@@ -1753,9 +1939,10 @@ class FatturaViewer(tk.Tk):
             try:
                 self.xml_doc = etree.parse(template_path)
                 self.log("File modello XML caricato con successo")
-                messagebox.showinfo("Modello Caricato", "Il modello di fattura è stato caricato con successo.")
                 # Aggiorna lo stato dei pulsanti
                 self.update_button_states()
+                # Entra direttamente in modalità modifica
+                self.edit_invoice()                
             except Exception as e:
                 self.log(f"Errore nel caricamento del file modello XML: {str(e)}")
                 self.xml_doc = None
@@ -1814,24 +2001,8 @@ class FatturaViewer(tk.Tk):
             
             if success and new_xml_path:
                 # Chiedi all'utente se vuole caricare il nuovo file XML
-                result = messagebox.askyesno("File XML creato", 
+                messagebox.showinfo("File XML creato", 
                                             f"Il file XML è stato creato con successo.\n\nVuoi caricarlo ora?")
-                if result:
-                    # Carica il nuovo file XML
-                    self.xml_path = new_xml_path
-                    self.xml_label.config(text=os.path.basename(new_xml_path))
-                    self.log(f"File XML creato e caricato: {new_xml_path}")
-                    
-                    try:
-                        self.xml_doc = etree.parse(new_xml_path)
-                        self.log("Nuovo file XML caricato con successo")
-                        # Aggiorna lo stato dei pulsanti
-                        self.update_button_states()
-                    except Exception as e:
-                        self.log(f"Errore nel caricamento del nuovo file XML: {str(e)}")
-                        self.xml_doc = None
-                        # Aggiorna lo stato dei pulsanti (disabilita)
-                        self.update_button_states()
         except Exception as e:
             self.log(f"Errore nella creazione del file XML da Excel: {str(e)}")
             traceback.print_exc()
@@ -2161,14 +2332,6 @@ class FatturaViewer(tk.Tk):
         # Controlla se un foglio di stile XSL è selezionato
         xsl_selected = self.xsl_path is not None
         
-        # Imposta lo stato dei pulsanti in base alle condizioni
-        if xml_loaded:
-            self.edit_btn.config(state=tk.NORMAL)
-            self.excel_save_btn.config(state=tk.NORMAL)
-        else:
-            self.edit_btn.config(state=tk.DISABLED)
-            self.excel_save_btn.config(state=tk.DISABLED)
-        
         # Il pulsante Visualizza richiede sia XML che XSL
         if xml_loaded and xsl_selected:
             self.view_btn.config(state=tk.NORMAL)
@@ -2177,9 +2340,6 @@ class FatturaViewer(tk.Tk):
         
         # Aggiorna anche le informazioni del database Excel
         self.update_excel_db_info()
-
-
-    # Aggiungi questi nuovi metodi alla classe FatturaViewer
 
 
     # Modifica i metodi load_excel_db e create_excel_db per aggiornare l'interfaccia
@@ -2240,6 +2400,10 @@ class FatturaViewer(tk.Tk):
                 
                 # Aggiorna l'interfaccia utente
                 self.update_button_states()
+
+                # Aggiorna lo stato del pulsante "Salva nel DB Excel" se siamo in modalità modifica
+                if hasattr(self, 'save_to_excel_btn') and self.save_to_excel_btn.winfo_exists():
+                    self.save_to_excel_btn.config(state=tk.NORMAL)                
                 
             except Exception as e:
                 self.log(f"Errore nel controllo del file Excel: {str(e)}")
@@ -2283,6 +2447,9 @@ class FatturaViewer(tk.Tk):
             
             # Aggiorna l'interfaccia utente
             self.update_button_states()
+            # Aggiorna lo stato del pulsante "Salva nel DB Excel" se siamo in modalità modifica
+            if hasattr(self, 'save_to_excel_btn') and self.save_to_excel_btn.winfo_exists():
+                self.save_to_excel_btn.config(state=tk.NORMAL)            
             
         except Exception as e:
             self.log(f"Errore nella creazione del database Excel: {str(e)}")
@@ -2331,8 +2498,22 @@ class FatturaViewer(tk.Tk):
             if sheet_name == self.excel_manager.master_sheet_name:
                 headers = [
                     "ID_Fattura", "NumeroFattura", "DataFattura", "TipoDocumento", 
-                    "ImportoTotale", "CedenteDenominazione", "CedentePartitaIVA", 
-                    "CessionarioDenominazione", "CessionarioPartitaIVA", "NotaFattura"
+                    "ImportoTotale", 
+                    
+                    # Dati del cedente prestatore (aggiunti per risolvere il problema)
+                    "CedenteIdPaese", "CedentePartitaIVA", "CedenteCodiceFiscale",
+                    "CedenteDenominazione", "CedenteNome", "CedenteCognome",
+                    "CedenteRegimeFiscale", "CedenteIndirizzo", "CedenteCAP", 
+                    "CedenteComune", "CedenteProvincia", "CedenteNazione",
+                    
+                    # Dati del cessionario committente (aggiunti per risolvere il problema)
+                    "CessionarioIdPaese", "CessionarioPartitaIVA", "CessionarioCodiceFiscale",
+                    "CessionarioDenominazione", "CessionarioNome", "CessionarioCognome",
+                    "CessionarioIndirizzo", "CessionarioCAP", "CessionarioComune", 
+                    "CessionarioProvincia", "CessionarioNazione",
+                    
+                    "NotaFattura",
+                    "ProgressivoInvio"
                 ]
             elif sheet_name == self.excel_manager.details_sheet_name:
                 headers = [
@@ -2363,11 +2544,107 @@ class FatturaViewer(tk.Tk):
             for i, _ in enumerate(headers, 1):
                 sheet.column_dimensions[openpyxl.utils.get_column_letter(i)].width = 20
         
+        # Popola il foglio StrutturaXML con i dati del modello di fattura
+        if self.excel_manager.structure_sheet_name in sheet_names:
+            self.populate_structure_sheet(wb, filepath)
+        
         # Salva il workbook
         wb.save(filepath)
 
-
-
+    def populate_structure_sheet(self, wb, filepath):
+        """
+        Popola il foglio StrutturaXML con la struttura estratta dal modello di fattura
+        
+        Args:
+            wb: Workbook Excel già aperto
+            filepath: Percorso del file Excel
+        """
+        try:
+            # Percorso del modello di fattura
+            model_path = os.path.join(self.project_dir, "modelloFattura.xml")
+            
+            # Verifica che il file modello esista
+            if not os.path.exists(model_path):
+                self.log(f"Modello fattura non trovato: {model_path}")
+                return
+            
+            # Carica il modello
+            try:
+                model_doc = etree.parse(model_path)
+                root = model_doc.getroot()
+                self.log("Modello fattura caricato per estrarre la struttura")
+            except Exception as e:
+                self.log(f"Errore nel caricamento del modello di fattura: {str(e)}")
+                return
+            
+            # Ottieni il foglio struttura
+            if self.excel_manager.structure_sheet_name not in wb.sheetnames:
+                self.log(f"Foglio {self.excel_manager.structure_sheet_name} non trovato nel file Excel")
+                return
+            
+            sheet = wb[self.excel_manager.structure_sheet_name]
+            
+            # Ottieni il dizionario delle descrizioni dal manager Excel
+            tag_descriptions = self.excel_manager._get_tag_descriptions()
+            
+            # Lista che conterrà tutti i percorsi XML da inserire nel foglio
+            structure_entries = []
+            
+            # Tieni traccia dei percorsi già aggiunti per evitare duplicati
+            added_paths = set()
+            
+            # Funzione ricorsiva per esplorare l'albero XML
+            def explore_xml_tree(element, path=""):
+                # Ottieni il tag senza namespace
+                if '}' in element.tag:
+                    tag = element.tag.split('}')[1]
+                else:
+                    tag = element.tag
+                    
+                # Costruisci il percorso completo
+                current_path = f"{path}/{tag}" if path else f"/{tag}"
+                
+                # Se questo percorso non è già stato aggiunto
+                if current_path not in added_paths:
+                    # Ottieni la descrizione dal dizionario
+                    description = tag_descriptions.get(tag, "")
+                    
+                    # Aggiungi alla lista
+                    structure_entries.append((tag, current_path, description))
+                    added_paths.add(current_path)
+                    
+                    # Debug log
+                    self.log(f"Aggiunto elemento: {tag} - {current_path}")
+                    
+                # Esplora tutti i figli in modo ricorsivo
+                for child in element:
+                    explore_xml_tree(child, current_path)
+            
+            # Avvia l'esplorazione dall'elemento radice
+            # Pulisci il namespace dall'elemento radice se necessario
+            if '}' in root.tag:
+                root_tag = root.tag.split('}')[1]
+            else:
+                root_tag = root.tag
+                
+            self.log(f"Inizio esplorazione albero XML partendo da elemento radice: {root_tag}")
+            explore_xml_tree(root)
+            
+            # Log del numero totale di elementi trovati
+            self.log(f"Trovati {len(structure_entries)} elementi nella struttura XML")
+            
+            # Aggiungi le righe al foglio Excel
+            for idx, (tag, path, description) in enumerate(structure_entries, 2):  # Inizia da riga 2 (dopo l'intestazione)
+                sheet.cell(row=idx, column=1, value=tag)
+                sheet.cell(row=idx, column=2, value=path)
+                sheet.cell(row=idx, column=3, value=description)
+            
+            self.log(f"Struttura XML estratta e salvata nel foglio {self.excel_manager.structure_sheet_name} con {len(structure_entries)} elementi")
+            
+        except Exception as e:
+            self.log(f"Errore nel popolamento del foglio struttura: {str(e)}")
+            traceback.print_exc()
+            
     # Aggiungi un metodo per aggiornare le informazioni del database Excel
     def update_excel_db_info(self):
         """Aggiorna l'etichetta del database Excel e lo stato dei pulsanti correlati"""
@@ -2450,14 +2727,13 @@ class FatturaViewer(tk.Tk):
                                 "La fattura è stata salvata con successo nel database Excel.")
                 
                 # Chiedi se l'utente vuole anche salvare il file XML
-                save_xml_too = messagebox.askyesno("Salvataggio XML", 
-                                                "Vuoi salvare anche il file XML?")
-                if save_xml_too:
-                    self.save_xml()  # Chiama il metodo per salvare anche l'XML
-                else:
+                #save_xml_too = messagebox.askyesno("Salvataggio XML", "Vuoi salvare anche il file XML?")
+                #if save_xml_too:
+                #    self.save_xml()  # Chiama il metodo per salvare anche l'XML
+                #else:
                     # Esci dalla modalità di modifica senza salvare il file XML
-                    self.cancel_edit()
-                    
+                #    self.cancel_edit()
+                self.cancel_edit()   
             else:
                 messagebox.showerror("Errore", 
                                 "Si è verificato un errore durante il salvataggio nel database Excel.")

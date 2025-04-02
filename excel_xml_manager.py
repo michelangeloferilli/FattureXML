@@ -214,10 +214,34 @@ class ExcelXmlManager:
         data = ""
         tipo_documento = ""
         importo_totale = ""
-        cedente_denominazione = ""
+        progressivo_invio = "" 
+        
+        # Dati cedente
+        cedente_id_paese = ""
         cedente_partita_iva = ""
-        cessionario_denominazione = ""
+        cedente_codice_fiscale = ""
+        cedente_denominazione = ""
+        cedente_nome = ""
+        cedente_cognome = ""
+        cedente_regime_fiscale = ""
+        cedente_indirizzo = ""
+        cedente_cap = ""
+        cedente_comune = ""
+        cedente_provincia = ""
+        cedente_nazione = ""
+        
+        # Dati cessionario
+        cessionario_id_paese = ""
         cessionario_partita_iva = ""
+        cessionario_codice_fiscale = ""
+        cessionario_denominazione = ""
+        cessionario_nome = ""
+        cessionario_cognome = ""
+        cessionario_indirizzo = ""
+        cessionario_cap = ""
+        cessionario_comune = ""
+        cessionario_provincia = ""
+        cessionario_nazione = ""
         
         try:
             # Numero fattura
@@ -239,37 +263,130 @@ class ExcelXmlManager:
             elem = root.xpath("//*/DatiGenerali/DatiGeneraliDocumento/ImportoTotaleDocumento", namespaces=self.NS)
             if elem:
                 importo_totale = elem[0].text
-            
-            # Cedente denominazione
-            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/Anagrafica/Denominazione", namespaces=self.NS)
+
+            # Progressivo invio
+            elem = root.xpath("//*/DatiTrasmissione/ProgressivoInvio", namespaces=self.NS)
             if elem:
-                cedente_denominazione = elem[0].text
+                progressivo_invio = elem[0].text           
+
+
+            # Dati cedente
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/IdFiscaleIVA/IdPaese", namespaces=self.NS)
+            if elem:
+                cedente_id_paese = elem[0].text
             
-            # Cedente partita IVA
             elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/IdFiscaleIVA/IdCodice", namespaces=self.NS)
             if elem:
                 cedente_partita_iva = elem[0].text
             
-            # Cessionario denominazione
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/CodiceFiscale", namespaces=self.NS)
+            if elem:
+                cedente_codice_fiscale = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/Anagrafica/Denominazione", namespaces=self.NS)
+            if elem:
+                cedente_denominazione = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/Anagrafica/Nome", namespaces=self.NS)
+            if elem:
+                cedente_nome = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/Anagrafica/Cognome", namespaces=self.NS)
+            if elem:
+                cedente_cognome = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/DatiAnagrafici/RegimeFiscale", namespaces=self.NS)
+            if elem:
+                cedente_regime_fiscale = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/Sede/Indirizzo", namespaces=self.NS)
+            if elem:
+                cedente_indirizzo = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/Sede/CAP", namespaces=self.NS)
+            if elem:
+                cedente_cap = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/Sede/Comune", namespaces=self.NS)
+            if elem:
+                cedente_comune = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/Sede/Provincia", namespaces=self.NS)
+            if elem:
+                cedente_provincia = elem[0].text
+            
+            elem = root.xpath("//*/CedentePrestatore/Sede/Nazione", namespaces=self.NS)
+            if elem:
+                cedente_nazione = elem[0].text
+            
+            # Dati cessionario
+            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/IdFiscaleIVA/IdPaese", namespaces=self.NS)
+            if elem:
+                cessionario_id_paese = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/IdFiscaleIVA/IdCodice", namespaces=self.NS)
+            if elem:
+                cessionario_partita_iva = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/CodiceFiscale", namespaces=self.NS)
+            if elem:
+                cessionario_codice_fiscale = elem[0].text
+            
             elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/Anagrafica/Denominazione", namespaces=self.NS)
             if elem:
                 cessionario_denominazione = elem[0].text
             
-            # Cessionario partita IVA
-            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/IdFiscaleIVA/IdCodice", namespaces=self.NS)
+            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/Anagrafica/Nome", namespaces=self.NS)
             if elem:
-                cessionario_partita_iva = elem[0].text
+                cessionario_nome = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/DatiAnagrafici/Anagrafica/Cognome", namespaces=self.NS)
+            if elem:
+                cessionario_cognome = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/Sede/Indirizzo", namespaces=self.NS)
+            if elem:
+                cessionario_indirizzo = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/Sede/CAP", namespaces=self.NS)
+            if elem:
+                cessionario_cap = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/Sede/Comune", namespaces=self.NS)
+            if elem:
+                cessionario_comune = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/Sede/Provincia", namespaces=self.NS)
+            if elem:
+                cessionario_provincia = elem[0].text
+            
+            elem = root.xpath("//*/CessionarioCommittente/Sede/Nazione", namespaces=self.NS)
+            if elem:
+                cessionario_nazione = elem[0].text
             
         except Exception as e:
             self.log(f"Errore nell'estrazione dei dati della fattura: {str(e)}")
         
         # Restituisci i dati estratti + ID + colonna note vuota
         return [
-            invoice_id, numero, data, tipo_documento,
-            importo_totale, cedente_denominazione, cedente_partita_iva,
-            cessionario_denominazione, cessionario_partita_iva, ""
+            invoice_id, numero, data, tipo_documento, importo_totale,
+            
+            # Dati cedente completi
+            cedente_id_paese, cedente_partita_iva, cedente_codice_fiscale,
+            cedente_denominazione, cedente_nome, cedente_cognome,
+            cedente_regime_fiscale, cedente_indirizzo, cedente_cap,
+            cedente_comune, cedente_provincia, cedente_nazione,
+            
+            # Dati cessionario completi
+            cessionario_id_paese, cessionario_partita_iva, cessionario_codice_fiscale,
+            cessionario_denominazione, cessionario_nome, cessionario_cognome,
+            cessionario_indirizzo, cessionario_cap, cessionario_comune,
+            cessionario_provincia, cessionario_nazione,
+            
+            "",
+            progressivo_invio,  # Colonna note vuota
         ]
-    
+
     def _extract_detail_lines(self, root, invoice_id):
         """
         Estrae tutte le linee di dettaglio
@@ -742,68 +859,147 @@ class ExcelXmlManager:
         master_data = invoice_data["master"]
         details_data = invoice_data["details"]
         summary_data = invoice_data["summary"]
+        progressivo_invio = master_data[-1] if len(master_data) > 28 else None
+        # Indici per i dati nel master_data
+        # Nota: questi indici devono corrispondere esattamente all'ordine restituito da _extract_invoice_data
+        
+        # Indici base
+        IDX_ID = 0
+        IDX_NUMERO = 1
+        IDX_DATA = 2
+        IDX_TIPO_DOC = 3
+        IDX_IMPORTO = 4
+        
+        # Indici dati cedente
+        IDX_CEDENTE_ID_PAESE = 5
+        IDX_CEDENTE_PARTITA_IVA = 6
+        IDX_CEDENTE_CF = 7
+        IDX_CEDENTE_DENOMINAZIONE = 8
+        IDX_CEDENTE_NOME = 9
+        IDX_CEDENTE_COGNOME = 10
+        IDX_CEDENTE_REGIME = 11
+        IDX_CEDENTE_INDIRIZZO = 12
+        IDX_CEDENTE_CAP = 13
+        IDX_CEDENTE_COMUNE = 14
+        IDX_CEDENTE_PROVINCIA = 15
+        IDX_CEDENTE_NAZIONE = 16
+        
+        # Indici dati cessionario
+        IDX_CESS_ID_PAESE = 17
+        IDX_CESS_PARTITA_IVA = 18
+        IDX_CESS_CF = 19
+        IDX_CESS_DENOMINAZIONE = 20
+        IDX_CESS_NOME = 21
+        IDX_CESS_COGNOME = 22
+        IDX_CESS_INDIRIZZO = 23
+        IDX_CESS_CAP = 24
+        IDX_CESS_COMUNE = 25
+        IDX_CESS_PROVINCIA = 26
+        IDX_CESS_NAZIONE = 27
         
         # Crea struttura DatiTrasmissione
         dati_trasmissione = etree.SubElement(header, f"{{{ns_uri}}}DatiTrasmissione")
         id_trasmittente = etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}IdTrasmittente")
-        etree.SubElement(id_trasmittente, f"{{{ns_uri}}}IdPaese").text = "IT"  # Default
-        etree.SubElement(id_trasmittente, f"{{{ns_uri}}}IdCodice").text = master_data[6] or "00000000000"  # Usa P.IVA cedente
-        etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}ProgressivoInvio").text = master_data[1] or "00001"  # Usa numero fattura
-        etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}FormatoTrasmissione").text = "FPR12"  # Default
-        etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}CodiceDestinatario").text = "0000000"  # Default
+        etree.SubElement(id_trasmittente, f"{{{ns_uri}}}IdPaese").text = master_data[IDX_CEDENTE_ID_PAESE] or "IT"
+        etree.SubElement(id_trasmittente, f"{{{ns_uri}}}IdCodice").text = master_data[IDX_CEDENTE_PARTITA_IVA] or "00000000000"
+
+
+        if progressivo_invio:
+            etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}ProgressivoInvio").text = progressivo_invio
+        else:
+            import time
+            new_progressivo_invio = f"INV{int(time.time())}"
+            etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}ProgressivoInvio").text = new_progressivo_invio
+    
+        etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}FormatoTrasmissione").text = "FPR12"
+        etree.SubElement(dati_trasmissione, f"{{{ns_uri}}}CodiceDestinatario").text = "0000000"
         
-        # Crea struttura CedentePrestatore
+        # Crea struttura CedentePrestatore con tutti i dati anagrafici
         cedente = etree.SubElement(header, f"{{{ns_uri}}}CedentePrestatore")
         dati_anagrafici_cedente = etree.SubElement(cedente, f"{{{ns_uri}}}DatiAnagrafici")
+        
+        # Dati fiscali cedente
         id_fiscale_iva_cedente = etree.SubElement(dati_anagrafici_cedente, f"{{{ns_uri}}}IdFiscaleIVA")
-        etree.SubElement(id_fiscale_iva_cedente, f"{{{ns_uri}}}IdPaese").text = "IT"  # Default
-        etree.SubElement(id_fiscale_iva_cedente, f"{{{ns_uri}}}IdCodice").text = master_data[6] or "00000000000"  # P.IVA cedente
+        etree.SubElement(id_fiscale_iva_cedente, f"{{{ns_uri}}}IdPaese").text = master_data[IDX_CEDENTE_ID_PAESE] or "IT"
+        etree.SubElement(id_fiscale_iva_cedente, f"{{{ns_uri}}}IdCodice").text = master_data[IDX_CEDENTE_PARTITA_IVA] or "00000000000"
+        
+        # Codice fiscale cedente (opzionale)
+        if master_data[IDX_CEDENTE_CF]:
+            etree.SubElement(dati_anagrafici_cedente, f"{{{ns_uri}}}CodiceFiscale").text = master_data[IDX_CEDENTE_CF]
+        
+        # Anagrafica cedente
         anagrafica_cedente = etree.SubElement(dati_anagrafici_cedente, f"{{{ns_uri}}}Anagrafica")
-        etree.SubElement(anagrafica_cedente, f"{{{ns_uri}}}Denominazione").text = master_data[5] or "Denominazione Cedente"
-        etree.SubElement(dati_anagrafici_cedente, f"{{{ns_uri}}}RegimeFiscale").text = "RF01"  # Default
         
+        # Gestisci denominazione o nome/cognome
+        if master_data[IDX_CEDENTE_DENOMINAZIONE]:
+            etree.SubElement(anagrafica_cedente, f"{{{ns_uri}}}Denominazione").text = master_data[IDX_CEDENTE_DENOMINAZIONE]
+        else:
+            if master_data[IDX_CEDENTE_NOME]:
+                etree.SubElement(anagrafica_cedente, f"{{{ns_uri}}}Nome").text = master_data[IDX_CEDENTE_NOME]
+            if master_data[IDX_CEDENTE_COGNOME]:
+                etree.SubElement(anagrafica_cedente, f"{{{ns_uri}}}Cognome").text = master_data[IDX_CEDENTE_COGNOME]
+        
+        # Regime fiscale
+        etree.SubElement(dati_anagrafici_cedente, f"{{{ns_uri}}}RegimeFiscale").text = master_data[IDX_CEDENTE_REGIME] or "RF01"
+        
+        # Sede cedente
         sede_cedente = etree.SubElement(cedente, f"{{{ns_uri}}}Sede")
-        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Indirizzo").text = "Indirizzo"  # Default
-        etree.SubElement(sede_cedente, f"{{{ns_uri}}}CAP").text = "00000"  # Default
-        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Comune").text = "Comune"  # Default
-        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Provincia").text = "RM"  # Default
-        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Nazione").text = "IT"  # Default
+        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Indirizzo").text = master_data[IDX_CEDENTE_INDIRIZZO] or "Indirizzo"
+        etree.SubElement(sede_cedente, f"{{{ns_uri}}}CAP").text = master_data[IDX_CEDENTE_CAP] or "00000"
+        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Comune").text = master_data[IDX_CEDENTE_COMUNE] or "Comune"
+        if master_data[IDX_CEDENTE_PROVINCIA]:
+            etree.SubElement(sede_cedente, f"{{{ns_uri}}}Provincia").text = master_data[IDX_CEDENTE_PROVINCIA]
+        etree.SubElement(sede_cedente, f"{{{ns_uri}}}Nazione").text = master_data[IDX_CEDENTE_NAZIONE] or "IT"
         
-        # Crea struttura CessionarioCommittente
+        # Crea struttura CessionarioCommittente con tutti i dati anagrafici
         cessionario = etree.SubElement(header, f"{{{ns_uri}}}CessionarioCommittente")
         dati_anagrafici_cessionario = etree.SubElement(cessionario, f"{{{ns_uri}}}DatiAnagrafici")
         
-        # Aggiungi partita IVA se presente
-        if master_data[8]:
+        # Dati fiscali cessionario
+        if master_data[IDX_CESS_PARTITA_IVA]:
             id_fiscale_iva_cessionario = etree.SubElement(dati_anagrafici_cessionario, f"{{{ns_uri}}}IdFiscaleIVA")
-            etree.SubElement(id_fiscale_iva_cessionario, f"{{{ns_uri}}}IdPaese").text = "IT"  # Default
-            etree.SubElement(id_fiscale_iva_cessionario, f"{{{ns_uri}}}IdCodice").text = master_data[8]
+            etree.SubElement(id_fiscale_iva_cessionario, f"{{{ns_uri}}}IdPaese").text = master_data[IDX_CESS_ID_PAESE] or "IT"
+            etree.SubElement(id_fiscale_iva_cessionario, f"{{{ns_uri}}}IdCodice").text = master_data[IDX_CESS_PARTITA_IVA]
         
-        # Aggiungi sempre anagrafica
+        # Codice fiscale cessionario (opzionale)
+        if master_data[IDX_CESS_CF]:
+            etree.SubElement(dati_anagrafici_cessionario, f"{{{ns_uri}}}CodiceFiscale").text = master_data[IDX_CESS_CF]
+        
+        # Anagrafica cessionario
         anagrafica_cessionario = etree.SubElement(dati_anagrafici_cessionario, f"{{{ns_uri}}}Anagrafica")
-        etree.SubElement(anagrafica_cessionario, f"{{{ns_uri}}}Denominazione").text = master_data[7] or "Denominazione Cessionario"
         
+        # Gestisci denominazione o nome/cognome
+        if master_data[IDX_CESS_DENOMINAZIONE]:
+            etree.SubElement(anagrafica_cessionario, f"{{{ns_uri}}}Denominazione").text = master_data[IDX_CESS_DENOMINAZIONE]
+        else:
+            if master_data[IDX_CESS_NOME]:
+                etree.SubElement(anagrafica_cessionario, f"{{{ns_uri}}}Nome").text = master_data[IDX_CESS_NOME]
+            if master_data[IDX_CESS_COGNOME]:
+                etree.SubElement(anagrafica_cessionario, f"{{{ns_uri}}}Cognome").text = master_data[IDX_CESS_COGNOME]
+        
+        # Sede cessionario
         sede_cessionario = etree.SubElement(cessionario, f"{{{ns_uri}}}Sede")
-        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Indirizzo").text = "Indirizzo"  # Default
-        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}CAP").text = "00000"  # Default
-        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Comune").text = "Comune"  # Default
-        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Provincia").text = "RM"  # Default
-        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Nazione").text = "IT"  # Default
+        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Indirizzo").text = master_data[IDX_CESS_INDIRIZZO] or "Indirizzo"
+        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}CAP").text = master_data[IDX_CESS_CAP] or "00000"
+        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Comune").text = master_data[IDX_CESS_COMUNE] or "Comune"
+        if master_data[IDX_CESS_PROVINCIA]:
+            etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Provincia").text = master_data[IDX_CESS_PROVINCIA]
+        etree.SubElement(sede_cessionario, f"{{{ns_uri}}}Nazione").text = master_data[IDX_CESS_NAZIONE] or "IT"
         
         # Crea struttura DatiGenerali
         dati_generali = etree.SubElement(body, f"{{{ns_uri}}}DatiGenerali")
         dati_generali_documento = etree.SubElement(dati_generali, f"{{{ns_uri}}}DatiGeneraliDocumento")
-        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}TipoDocumento").text = master_data[3] or "TD01"
-        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}Divisa").text = "EUR"  # Default
+        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}TipoDocumento").text = master_data[IDX_TIPO_DOC] or "TD01"
+        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}Divisa").text = "EUR"
         
         # Data fattura
-        data_fattura = master_data[2]
+        data_fattura = master_data[IDX_DATA]
         if isinstance(data_fattura, datetime.datetime):
             data_fattura = data_fattura.strftime("%Y-%m-%d")
         etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}Data").text = data_fattura or datetime.date.today().strftime("%Y-%m-%d")
         
-        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}Numero").text = master_data[1] or "00001"
-        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}ImportoTotaleDocumento").text = str(master_data[4] or "0.00")
+        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}Numero").text = master_data[IDX_NUMERO] or "00001"
+        etree.SubElement(dati_generali_documento, f"{{{ns_uri}}}ImportoTotaleDocumento").text = str(master_data[IDX_IMPORTO] or "0.00")
         
         # Crea struttura DatiBeniServizi
         dati_beni = etree.SubElement(body, f"{{{ns_uri}}}DatiBeniServizi")
@@ -862,7 +1058,9 @@ class ExcelXmlManager:
         data_scadenza = data_fattura_obj + datetime.timedelta(days=30)
         etree.SubElement(dettaglio_pagamento, f"{{{ns_uri}}}DataScadenzaPagamento").text = data_scadenza.strftime("%Y-%m-%d")
         
-        etree.SubElement(dettaglio_pagamento, f"{{{ns_uri}}}ImportoPagamento").text = str(master_data[4] or "0.00")
+        etree.SubElement(dettaglio_pagamento, f"{{{ns_uri}}}ImportoPagamento").text = str(master_data[IDX_IMPORTO] or "0.00")
+
+        etree.SubElement(dettaglio_pagamento, f"{{{ns_uri}}}CodicePagamento").text = "RB01"  # Valore di default
         
         # Applica indentazione per migliorare la leggibilità
         self._indent_xml(root)
@@ -875,6 +1073,7 @@ class ExcelXmlManager:
         tree.getroot().addprevious(pi)
         
         return tree
+
 
     def _indent_xml(self, elem, level=0):
         """
